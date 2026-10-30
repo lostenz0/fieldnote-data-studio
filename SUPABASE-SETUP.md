@@ -1,13 +1,21 @@
-# Optional Supabase account setup
+# Supabase account setup
 
-The dashboard works without an account. If you choose to enable accounts, Supabase stores datasets only after a user signs in to the project configured in this browser app. No Supabase credentials are included here.
+The dashboard works without an account. This deployment is connected to its Supabase project for email sign-in and private saved datasets. Imported data is sent to Supabase only when a signed-in user imports it for account saving.
 
-1. Create a Supabase project.
-2. In the Supabase SQL Editor, run [`supabase-schema.sql`](./supabase-schema.sql). It creates `public.analytics_datasets`, enables Row Level Security, and grants authenticated users access only to rows whose `user_id` matches their account ID.
-3. In Project Settings → API, copy the Project URL and the publishable key (or legacy `anon` key) into `supabase-config.js`, replacing the placeholders. Do not use a `service_role` key, secret key, password, or other private credential in frontend code.
-4. In Authentication → URL Configuration, set the Site URL and Redirect URLs to your local site and the deployed GitHub Pages URL. For a local static preview, use that preview's actual origin.
-5. Reload Fieldnote and test account creation, email confirmation, sign-in, password reset, and dataset saving with your own project.
+## Current deployment
 
-The example config is intentionally unconfigured, so authentication and saved datasets are not enabled by default. When you select Sign in without valid setup, the app explains what configuration is required. Do not rely on account features until you have tested them against your own Supabase project.
+For this deployment, the database schema is applied, email sign-up is enabled, email confirmation is required, and the Site URL and redirect allow-list include the GitHub Pages site. To create an account, choose **Sign in → Create an account** on the live site and confirm your email before signing in.
 
-Imported data works locally without Supabase. It is sent to Supabase only when a configured user is signed in and chooses to import data for account saving.
+Supabase's default email service is limited to 2 emails per hour. Configure a custom SMTP provider under **Authentication → Emails → SMTP Settings** before opening sign-ups to a larger audience.
+
+Each authenticated user can only read and save their own datasets because the table has Row Level Security policies scoped to their user ID.
+
+## Connect a different Supabase project
+
+1. In its SQL Editor, run [`supabase-schema.sql`](./supabase-schema.sql). It creates `public.analytics_datasets`, enables Row Level Security, and grants authenticated users access only to rows whose `user_id` matches their account ID.
+2. Replace the Project URL and publishable (or legacy `anon`) key in `supabase-config.js` with that project's values. Publishable keys are intended for browser use. Never use a `service_role` or secret key, database password, or other private credential in frontend code.
+3. In **Authentication → URL Configuration**, set the Site URL and Redirect URLs to the deployed site. Add the actual local origin too if you use a local static server.
+4. Enable email sign-ups and configure custom SMTP if you need more than the default email rate limit.
+5. Test account creation, email confirmation, sign-in, password reset, and dataset saving.
+
+Never share Supabase secret keys or database passwords.

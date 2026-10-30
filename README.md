@@ -13,7 +13,7 @@ Fieldnote is a lightweight, responsive CSV dashboard. Import a file to explore s
 - Light and dark themes; language, currency, and theme preferences are remembered in this browser
 - Optional Supabase authentication and private saved datasets
 
-The sample dashboard, local CSV import, charts, search, CSV export, and PDF report work without an account. PDF export opens a print dialog; choose **Save as PDF** to download the report. Supabase account features are unavailable until you configure your own project. No imported data is sent to a service when you use the dashboard without signing in.
+The sample dashboard, local CSV import, charts, search, CSV export, and PDF report work without an account. PDF export opens a print dialog; choose **Save as PDF** to download the report. Email sign-in and private saved datasets are connected to the project's Supabase instance. Imported data is sent to Supabase only when a signed-in user imports it for account saving.
 
 The app formats monetary columns in Pakistani rupees (PKR) by default. Choose USD from the currency menu to change the display. This changes formatting only; it does not convert values or fetch exchange rates. Make sure imported monetary values are already in the selected currency.
 
@@ -40,15 +40,16 @@ The page loads these browser libraries from public CDNs: Chart.js, PapaParse, Su
 
 ## Optional Supabase setup
 
-The included `supabase-config.js` contains placeholders, not working credentials. To enable account features:
+The deployed `supabase-config.js` is configured for this project's Supabase instance. To connect a different project:
 
 1. Create a Supabase project.
 2. In its SQL Editor, run [`supabase-schema.sql`](./supabase-schema.sql). It creates the `analytics_datasets` table and enables Row Level Security policies restricting each authenticated user to rows with their own `user_id`.
-3. In `supabase-config.js`, replace the example project URL and publishable (or legacy `anon`) key with your project's values. Never use a `service_role` or secret key in this frontend.
-4. Configure Supabase Authentication's Site URL and Redirect URLs for the local site and the deployed GitHub Pages URL.
-5. Reload the page and test sign-up, email confirmation, sign-in, password reset, and saving with your own project before relying on them.
+3. Replace the Project URL and publishable (or legacy `anon`) key in `supabase-config.js` with that project's values. Publishable keys are intended for browser use; never put a `service_role` or secret key in frontend code.
+4. Configure Supabase Authentication's Site URL and Redirect URLs for your deployed site.
 
-Without valid project configuration, the dashboard remains usable and the sign-in dialog explains that account features need setup. This repository does not include credentials, and account features have not been tested against a real project.
+For this deployment, email sign-up and confirmation are enabled, the GitHub Pages redirect is configured, and the database schema is applied. Create an account on the live site and confirm your email before signing in. Supabase's default email service is limited to 2 emails per hour; configure a custom SMTP provider for wider public use.
+
+The app remains usable without an account. Each authenticated user can only read and save their own datasets because the database table has Row Level Security policies scoped to their user ID. Never share Supabase secret keys or database passwords.
 
 For detailed Supabase steps, see [`SUPABASE-SETUP.md`](./SUPABASE-SETUP.md).
 
@@ -58,6 +59,6 @@ For detailed Supabase steps, see [`SUPABASE-SETUP.md`](./SUPABASE-SETUP.md).
 2. On GitHub, open **Settings → Pages**.
 3. Under **Build and deployment**, choose **Deploy from a branch**, select your branch (commonly `main`) and the **/(root)** folder, then save.
 4. Wait for the Pages deployment to finish. Open the URL GitHub shows; the relative `./favicon.svg` asset works from a repository-root Pages site.
-5. If you enabled Supabase, add that exact Pages URL to its Authentication Site URL and Redirect URLs, then test the account flows there.
+5. If you connect Supabase, add that exact Pages URL to its Authentication Site URL and Redirect URLs, then test the account flows there.
 
-Publishing to GitHub Pages is a manual action; this project has not been uploaded or published by these instructions.
+This project is published from the `main` branch's root folder at <https://lostenz0.github.io/fieldnote-data-studio/>.
