@@ -1,4 +1,4 @@
 window.FIELDNOTE_SUPABASE_CONFIG = {
-  url: "https://YOUR_PROJECT_ID.supabase.co",
-  anonKey: "YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY"
+  url: "https://thgeuswmkqcyajwvhnkv.supabase.co",
+  anonKey: "sb_publishable_YWWwPDX1fYNJhgAGWrR_Uw_Re93aLxU"
 };
