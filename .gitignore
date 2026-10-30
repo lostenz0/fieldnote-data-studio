@@ -1,0 +1,51 @@
+# Environment files and local credentials
+.env
+.env.*
+.secrets/
+secrets/
+.npmrc
+.netrc
+.pypirc
+*.pem
+*.key
+*.p12
+*.pfx
+*service-role*
+*service_role*
+*serviceRole*
+*secret*
+*api-key*
+*api_key*
+*.token
+
+# Dependencies and generated build output
+node_modules/
+dist/
+build/
+out/
+coverage/
+.next/
+.nuxt/
+.output/
+.vercel/
+.netlify/
+*.tsbuildinfo
+
+# Python-generated files and local environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Git metadata inside nested folders
+**/.git/
+
+# Local data and a separate nested repository; neither is needed by the site
+/data/
+/data analytics/
+
+*.log
+*.csv
+.DS_Store
+Thumbs.db
