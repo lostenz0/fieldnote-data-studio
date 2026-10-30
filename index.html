@@ -1,0 +1,974 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f7f2">
+  <title>Fieldnote | Data studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./supabase-config.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f6f7f2;
+      --surface: #fff;
+      --ink: #202b26;
+      --muted: #78827b;
+      --line: #e7eae3;
+      --green: #277a5e;
+      --green-dark: #1d5e48;
+      --green-pale: #e8f2eb;
+      --yellow: #f1d978;
+      --coral: #e78469;
+      --shadow: 0 12px 32px rgb(34 49 40 / 5%);
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --paper: #111713;
+      --surface: #1d2721;
+      --ink: #f7faf7;
+      --muted: #d0d9d2;
+      --line: #46564a;
+      --green: #58aa82;
+      --green-dark: #86d3a9;
+      --green-pale: #263c31;
+      --yellow: #8d782a;
+      --coral: #c77b63;
+      --shadow: 0 12px 32px rgb(0 0 0 / 28%);
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background-color: var(--paper);
+      background-image: radial-gradient(#dfe5dc 0.7px, transparent 0.7px);
+      background-size: 19px 19px;
+      font-family: "DM Sans", sans-serif;
+      font-size: 15px;
+      transition: background-color .22s, color .22s;
+    }
+    :root[data-theme="dark"] body { background-image: radial-gradient(#202b23 0.7px, transparent 0.7px); }
+    button, select, input { font: inherit; }
+    button { color: inherit; }
+    .app { display: grid; grid-template-columns: 224px minmax(0, 1fr); min-height: 100vh; }
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      padding: 27px 17px 18px;
+      background: #f0f3ec;
+      border-right: 1px solid #e6e9e1;
+    }
+    :root[data-theme="dark"] .sidebar { background: #1c2420; border-color: var(--line); }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 0 9px; }
+    .brand-mark { display: grid; width: 31px; height: 31px; place-items: center; color: white; background: var(--green); border-radius: 9px; }
+    .brand-mark i { width: 17px; height: 17px; }
+    :root[data-theme="dark"] .workspace { background: #222b26; border-color: var(--line); }
+    :root[data-theme="dark"] .nav button { color: #c8d3ca; }
+    :root[data-theme="dark"] .nav button.active { color: #a6e2bf; background: #2b3d32; }
+    :root[data-theme="dark"] .nav button:hover:not(.active) { background: #26312a; }
+    :root[data-theme="dark"] .help-link { color: #c8d3ca; }
+    :root[data-theme="dark"] .profile { border-color: var(--line); }
+    .brand-name { font-size: 16px; font-weight: 700; letter-spacing: 0; }
+    :root[data-theme="dark"] .nav-label, :root[data-theme="dark"] .eyebrow { color: #b7c5ba; }
+    .workspace { margin: 31px 5px 25px; padding: 12px 12px 11px; background: rgb(255 255 255 / 70%); border: 1px solid #e6e9e1; border-radius: 8px; }
+    .eyebrow { color: var(--muted); font-family: "DM Mono", monospace; font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: uppercase; }
+    .workspace-name { display: flex; align-items: center; justify-content: space-between; margin-top: 7px; font-size: 13px; font-weight: 600; }
+    .workspace-name i { width: 15px; color: var(--muted); }
+    .nav-label { margin: 0 10px 9px; color: #718076; font-family: "DM Mono", monospace; font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: uppercase; }
+    .nav { display: grid; gap: 4px; }
+    .nav button { display: flex; align-items: center; gap: 11px; width: 100%; padding: 10px 11px; color: #56645a; text-align: left; background: transparent; border: 0; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background .18s, color .18s, transform .18s, box-shadow .18s; }
+    .nav button.active { color: var(--green-dark); background: #e1ece3; font-weight: 600; }
+    .nav button:hover:not(.active) { background: rgb(255 255 255 / 65%); }
+    .nav i { width: 17px; height: 17px; }
+    .sidebar-bottom { margin-top: auto; }
+    .help-link { display: flex; align-items: center; gap: 10px; padding: 10px 11px; color: #56645a; text-decoration: none; transition: background .18s, color .18s, transform .18s; }
+    .help-link i { width: 16px; }
+    .profile { display: flex; align-items: center; gap: 10px; margin-top: 13px; padding: 15px 7px 0; border-top: 1px solid #e0e5dc; }
+    .avatar { display: grid; width: 31px; height: 31px; place-items: center; color: #765641; background: #f2d9bf; border-radius: 50%; font-size: 12px; font-weight: 700; }
+    .profile-name { font-size: 12px; font-weight: 600; }
+    .profile-role { margin-top: 2px; color: var(--muted); font-size: 11px; }
+    main { min-width: 0; padding: 34px clamp(22px, 4vw, 61px) 48px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 37px; }
+    .crumb { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+    .crumb i { width: 13px; height: 13px; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .language-control { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 8px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+    .language-control i { width: 15px; height: 15px; flex: 0 0 auto; }
+    .language-control select { max-width: 105px; padding: 0; color: var(--ink); background: transparent; border: 0; outline-color: var(--green); font-size: 12px; font-weight: 600; }
+    .theme-toggle { white-space: nowrap; }
+    .theme-toggle i { width: 16px; height: 16px; }
+    .updated { color: var(--muted); font-size: 12px; font-weight: 500; }
+    .button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; padding: 0 13px; color: var(--ink); border: 1px solid var(--line); border-radius: 6px; background: var(--surface); cursor: pointer; transition: background .18s, color .18s, transform .18s, box-shadow .18s, border-color .18s; }
+    .button:hover { background: #f1f5ef; border-color: #bac9bd; box-shadow: 0 5px 13px rgb(26 49 34 / 10%); transform: translateY(-2px); }
+    :root[data-theme="dark"] .button:hover { background: #2c3830; }
+    .button.primary { color: white; background: var(--green); border-color: var(--green); }
+    .button.primary:hover { background: var(--green-dark); }
+    :root[data-theme="dark"] .button.primary { background: #3f8d67; border-color: #3f8d67; }
+    :root[data-theme="dark"] .button.primary:hover { background: #367c5a; border-color: #58aa82; }
+    button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+    :root[dir="rtl"] .nav button:hover:not(.active) { transform: translateX(-3px); }
+    :root[dir="ltr"] .nav button:hover:not(.active) { transform: translateX(3px); }
+    .button i { width: 16px; height: 16px; }
+    .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 22px; margin-bottom: 24px; }
+    h1 { margin: 0; font-family: Fraunces, Georgia, serif; font-size: clamp(29px, 3.2vw, 39px); font-weight: 600; line-height: 1.1; letter-spacing: 0; }
+    .subtitle { margin: 9px 0 0; color: var(--muted); font-size: 13px; }
+    .range-select, .control-select { min-height: 36px; padding: 0 30px 0 11px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; outline-color: var(--green); }
+    .range-select, .control-select, .dataset-select, .language-control { transition: border-color .18s, box-shadow .18s, background .18s; }
+    .range-select:hover, .control-select:hover, .dataset-select:hover, .language-control:hover { border-color: var(--green); box-shadow: 0 3px 10px rgb(39 122 94 / 12%); }
+    :root[data-theme="dark"] .range-select:hover, :root[data-theme="dark"] .control-select:hover, :root[data-theme="dark"] .dataset-select:hover, :root[data-theme="dark"] .language-control:hover { background: #29362e; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; margin-bottom: 16px; }
+    .view-shell { position: relative; min-width: 0; }
+    .page-view { display: none; min-width: 0; }
+    .page-view.active { display: block; animation: view-slide-in .28s cubic-bezier(.2, .75, .25, 1) both; }
+    @keyframes view-slide-in { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
+    :root[dir="rtl"] .page-view.active { animation-name: view-slide-in-rtl; }
+    @keyframes view-slide-in-rtl { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: translateX(0); } }
+    .page-view > .page-heading { margin-top: 0; }
+    .view-upload { margin: 0 0 15px; }
+    .metric { min-width: 0; padding: 17px 18px 15px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); transition: transform .18s, box-shadow .18s, border-color .18s; }
+    .metric:hover, .panel:hover { border-color: #a9c5b0; box-shadow: 0 14px 34px rgb(34 49 40 / 10%); }
+    .metric:hover { transform: translateY(-2px); }
+    :root[data-theme="dark"] .metric:hover, :root[data-theme="dark"] .panel:hover { border-color: #62856c; box-shadow: 0 14px 34px rgb(0 0 0 / 28%); }
+    .metric-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 14px; font-weight: 600; }
+    .metric-icon { display: grid; width: 29px; height: 29px; flex: 0 0 auto; place-items: center; color: var(--green); background: var(--green-pale); border-radius: 7px; }
+    .metric:nth-child(2) .metric-icon { color: #b37a22; background: #fbf3d9; }
+    .metric:nth-child(3) .metric-icon { color: #c26e56; background: #f9e9e2; }
+    .metric:nth-child(4) .metric-icon { color: #557a9b; background: #e8eff4; }
+    :root[data-theme="dark"] .metric:nth-child(2) .metric-icon { color: #f0d477; background: #40391f; }
+    :root[data-theme="dark"] .metric:nth-child(3) .metric-icon { color: #f0a08a; background: #402c26; }
+    :root[data-theme="dark"] .metric:nth-child(4) .metric-icon { color: #9dc8e4; background: #293a46; }
+    .metric-icon i { width: 15px; height: 15px; }
+    .metric-value { overflow: hidden; margin-top: 14px; color: var(--ink); font-size: clamp(21px, 2.2vw, 28px); font-weight: 700; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
+    .metric-note { margin-top: 5px; color: #58675d; font-size: 13px; font-weight: 600; }
+    :root[data-theme="dark"] .metric-note { color: #d5ded7; }
+    .metric-note .up { color: var(--green); font-weight: 600; }
+    .tutorial { margin: 0 0 19px; padding: 18px 0 16px; border-top: 1px solid #dfe5dc; border-bottom: 1px solid #dfe5dc; }
+    .tutorial-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+    .tutorial-heading h2 { margin: 0; font-size: 15px; font-weight: 700; }
+    .tutorial-heading p { margin: 5px 0 0; color: var(--muted); font-size: 13px; font-weight: 500; line-height: 1.55; }
+    .tutorial-actions { display: flex; flex: 0 0 auto; gap: 8px; }
+    .tutorial-actions .button { min-height: 34px; font-size: 11px; }
+    .tutorial-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
+    .tutorial-step { padding-top: 10px; border-top: 2px solid #dce5dc; }
+    .tutorial-step-number { color: var(--green); font-family: "DM Mono", monospace; font-size: 11px; font-weight: 600; }
+    .tutorial-step h3 { margin: 6px 0 5px; font-size: 13px; font-weight: 700; }
+    .tutorial-step p { margin: 0; color: #56645a; font-size: 12px; font-weight: 500; line-height: 1.65; }
+    .tutorial-note { margin: 13px 0 0; color: #5b6547; font-size: 12px; font-weight: 500; line-height: 1.6; }
+    .tutorial-note strong { color: #39462e; }
+    :root[data-theme="dark"] .tutorial { border-color: #36433a; }
+    :root[data-theme="dark"] .tutorial-step { border-color: #3a4b3e; }
+    :root[data-theme="dark"] .tutorial-step p, :root[data-theme="dark"] .tutorial-note { color: #d0dbd2; }
+    :root[data-theme="dark"] .tutorial-note strong { color: #f0f5f1; }
+    .tutorial-step { transition: border-color .18s, transform .18s; }
+    .tutorial-step:hover { border-color: var(--green); transform: translateY(-2px); }
+    .content-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 15px; align-items: stretch; }
+    .panel { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
+    .chart-panel { padding: 19px 20px 14px; }
+    .panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+    .panel-title { margin: 0; font-size: 15px; font-weight: 700; }
+    .panel-caption { margin: 5px 0 0; color: #68776d; font-size: 12px; font-weight: 500; }
+    :root[data-theme="dark"] .panel-caption { color: #c0ccc3; }
+    .chart-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+    .control-select { min-height: 32px; padding-left: 9px; font-size: 12px; font-weight: 500; }
+    .chart-switch { display: flex; gap: 2px; padding: 3px; background: #f2f4ef; border-radius: 6px; }
+    .chart-switch button { display: grid; width: 28px; height: 26px; place-items: center; color: #657369; background: transparent; border: 0; border-radius: 4px; cursor: pointer; transition: background .18s, color .18s, transform .18s; }
+    .chart-switch button:hover { color: var(--green-dark); background: var(--green-pale); transform: translateY(-1px); }
+    :root[data-theme="dark"] .chart-switch button { color: #c0ccc3; }
+    .chart-switch button.selected { color: var(--green-dark); background: white; box-shadow: 0 1px 3px rgb(20 30 20 / 10%); }
+    .chart-switch i { width: 15px; height: 15px; }
+    .chart-wrap { position: relative; height: 235px; margin-top: 19px; }
+    .insight-panel { position: relative; overflow: hidden; padding: 20px; background: #edf4ed; border-color: #e3ebe2; }
+    :root[data-theme="dark"] .insight-panel { background: #26372d; border-color: #405447; }
+    .insight-panel::after { position: absolute; right: -24px; bottom: -34px; width: 108px; height: 108px; border: 1px solid #d6e5d7; border-radius: 50%; content: ""; }
+    :root[data-theme="dark"] .insight-panel::after { border-color: #3e5847; }
+    .insight-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; font-weight: 700; }
+    .spark { display: grid; width: 25px; height: 25px; place-items: center; color: #886b19; background: var(--yellow); border-radius: 7px; }
+    :root[data-theme="dark"] .spark { color: #fff0b0; background: #5e511f; }
+    .spark i { width: 14px; height: 14px; }
+    .insight-copy { margin: 17px 0 0; color: #42564a; font-size: 13px; font-weight: 500; line-height: 1.7; }
+    .insight-copy strong { color: #243d30; font-weight: 700; }
+    :root[data-theme="dark"] .insight-copy { color: #d0dbd2; }
+    :root[data-theme="dark"] .insight-copy strong { color: #f1f7f2; }
+    .insight-stat { display: flex; align-items: center; gap: 8px; margin-top: 17px; padding-top: 13px; border-top: 1px solid #dbe7db; color: #4c6252; font-size: 12px; font-weight: 500; }
+    :root[data-theme="dark"] .insight-stat { color: #c9d8cd; border-color: #425548; }
+    .insight-stat i { width: 15px; height: 15px; color: var(--green); }
+    :root[data-theme="dark"] .insight-stat { border-color: #405447; }
+    .data-panel { margin-top: 15px; padding: 18px 20px 4px; }
+    .table-heading { align-items: center; margin-bottom: 12px; }
+    .table-actions { display: flex; align-items: center; gap: 9px; }
+    .row-count { color: var(--muted); font-size: 12px; font-weight: 500; }
+    .text-button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 0; color: var(--green-dark); background: transparent; border: 0; cursor: pointer; font-size: 12px; font-weight: 700; transition: transform .18s, color .18s; }
+    .text-button:hover { transform: translateX(3px); }
+    :root[dir="rtl"] .text-button:hover { transform: translateX(-3px); }
+    .text-button i { width: 14px; height: 14px; }
+    .table-scroll { overflow: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; white-space: nowrap; }
+    thead { color: #68776d; font-family: "DM Mono", monospace; font-size: 11px; font-weight: 500; text-transform: uppercase; }
+    th { padding: 10px 13px; border-top: 1px solid #edf0ea; border-bottom: 1px solid #edf0ea; font-weight: 600; }
+    td { padding: 11px 13px; color: #3c4a40; border-bottom: 1px solid #f0f2ed; font-size: 12px; font-weight: 500; }
+    :root[data-theme="dark"] thead { color: #c0ccc3; }
+    :root[data-theme="dark"] th, :root[data-theme="dark"] td { border-color: #3b4a40; }
+    :root[data-theme="dark"] td { color: #e1e9e2; }
+    tbody tr td { transition: background .16s, color .16s; }
+    tbody tr:hover td { color: var(--ink); background: var(--green-pale); }
+    tbody tr:last-child td { border-bottom: 0; }
+    td.numeric { font-family: "DM Mono", monospace; font-size: 11px; }
+    .drop-overlay { position: fixed; z-index: 5; inset: 14px; display: none; place-items: center; color: var(--green-dark); background: rgb(241 247 240 / 95%); border: 2px dashed #7eb099; border-radius: 12px; font-size: 20px; font-weight: 600; pointer-events: none; }
+    .drop-overlay.visible { display: grid; }
+    .toast { position: fixed; right: 24px; bottom: 23px; z-index: 8; max-width: min(390px, calc(100vw - 32px)); padding: 12px 16px; color: white; background: #253b30; border-radius: 7px; box-shadow: 0 8px 26px rgb(0 0 0 / 16%); opacity: 0; transform: translateY(8px); transition: opacity .2s, transform .2s; pointer-events: none; }
+    .toast.visible { opacity: 1; transform: translateY(0); }
+    .account-actions { display: flex; align-items: center; gap: 8px; }
+    .account-email { max-width: 180px; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .dataset-select { max-width: 150px; min-height: 36px; padding: 0 25px 0 8px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; font-size: 12px; font-weight: 600; }
+    dialog.auth-modal { width: min(440px, calc(100vw - 32px)); max-width: none; padding: 0; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 24px 80px rgb(0 0 0 / 24%); }
+    dialog.auth-modal::backdrop { background: rgb(16 25 19 / 55%); backdrop-filter: blur(3px); }
+    .auth-form { display: grid; gap: 15px; padding: 23px; }
+    .auth-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; }
+    .auth-heading h2 { margin: 0; font-family: Fraunces, Georgia, serif; font-size: 24px; font-weight: 600; }
+    .auth-heading p { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .auth-close { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+    .auth-close i { width: 16px; height: 16px; }
+    .auth-field { display: grid; gap: 6px; color: var(--muted); font-size: 13px; font-weight: 600; }
+    .auth-field input { width: 100%; min-height: 39px; padding: 0 10px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 6px; outline-color: var(--green); }
+    .auth-warning { padding: 11px 12px; color: #70551e; background: #fbf3d9; border-radius: 6px; font-size: 11px; line-height: 1.6; }
+    :root[data-theme="dark"] .auth-warning { color: #eed58a; background: #3d3520; }
+    .auth-message { min-height: 17px; margin: 0; color: var(--muted); font-size: 12px; font-weight: 500; line-height: 1.5; }
+    .auth-links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+    .auth-link { padding: 3px 0; color: var(--green-dark); background: transparent; border: 0; cursor: pointer; font-size: 11px; }
+    .auth-form .button:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+    .mobile-brand { display: none; }
+    @media (max-width: 1000px) {
+      .app { grid-template-columns: 190px minmax(0, 1fr); }
+      .sidebar { padding-right: 12px; padding-left: 12px; }
+      main { padding-right: 25px; padding-left: 25px; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .content-grid { grid-template-columns: minmax(0, 1fr); }
+    }
+    @media (max-width: 720px) {
+      .app { display: block; padding-bottom: 62px; }
+      .sidebar { position: fixed; z-index: 4; right: 0; bottom: 0; left: 0; display: block; min-height: 0; height: 60px; padding: 5px 9px; background: rgb(248 249 245 / 96%); border-top: 1px solid var(--line); border-right: 0; backdrop-filter: blur(12px); }
+      .brand, .workspace, .nav-label, .sidebar-bottom { display: none; }
+      .nav { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; height: 100%; }
+      .nav button { flex-direction: column; justify-content: center; gap: 2px; padding: 3px 1px; font-size: 10px; font-weight: 600; line-height: 1.05; text-align: center; }
+      .nav i { width: 16px; height: 16px; }
+      main { padding: 18px 16px 27px; }
+      .topbar { margin-bottom: 24px; }
+      .crumb { display: none; }
+      .top-actions { width: 100%; flex-wrap: wrap; justify-content: flex-start; }
+      #upload-button { margin-inline-start: auto; }
+      .account-email { max-width: 112px; }
+      .dataset-select { max-width: 130px; }
+      .updated { font-size: 10px; }
+      .button { min-height: 35px; padding: 0 10px; font-size: 12px; }
+      .page-heading { align-items: flex-start; margin-bottom: 18px; }
+      .page-heading .range-select { max-width: 135px; font-size: 11px; }
+      .subtitle { max-width: 250px; line-height: 1.5; }
+      .tutorial { margin-bottom: 15px; padding: 15px 0; }
+      .tutorial-heading { flex-direction: column; }
+      .tutorial-actions { width: 100%; }
+      .tutorial-actions .button { flex: 1; }
+      .tutorial-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; margin-top: 15px; }
+      .tutorial-step p { font-size: 10px; }
+      .tutorial-note { font-size: 10px; }
+      .metrics { gap: 9px; margin-bottom: 12px; }
+      .metric { padding: 13px 12px; }
+      .metric-top { font-size: 12px; }
+      .metric-icon { width: 25px; height: 25px; }
+      .metric-value { margin-top: 10px; font-size: 23px; }
+      .metric-note { font-size: 12px; }
+      .content-grid { grid-template-columns: 1fr; gap: 11px; }
+      .chart-panel { padding: 16px 13px 12px; }
+      .panel-heading { flex-wrap: wrap; }
+      .chart-controls { width: 100%; }
+      .chart-wrap { height: 205px; margin-top: 13px; }
+      .insight-panel { padding: 15px; }
+      .insight-copy { margin-top: 11px; }
+      .insight-stat { margin-top: 11px; padding-top: 10px; }
+      .data-panel { margin-top: 11px; padding: 15px 12px 4px; }
+      .table-heading { align-items: flex-start; }
+      .row-count { display: none; }
+      th, td { padding-right: 10px; padding-left: 10px; }
+    }
+    @media (max-width: 380px) {
+      .updated { display: none; }
+      .page-heading { flex-direction: column; }
+      .page-heading .range-select { max-width: 100%; }
+      .metric-top { align-items: flex-start; }
+      .metric-note { min-height: 24px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Main navigation">
+      <div class="brand"><span class="brand-mark"><i data-lucide="sprout"></i></span><span class="brand-name">fieldnote</span></div>
+      <div class="workspace"><div class="eyebrow" data-i18n="workspace">Workspace</div><div class="workspace-name"><span data-i18n="project">My first project</span><i data-lucide="chevrons-up-down"></i></div></div>
+      <div class="nav-label" data-i18n="studio">Your studio</div>
+      <nav class="nav">
+        <button class="active" type="button" data-nav="overview"><i data-lucide="layout-dashboard"></i><span data-i18n="overview">Overview</span></button>
+        <button type="button" data-nav="explore"><i data-lucide="chart-no-axes-combined"></i><span data-i18n="explore">Explore data</span></button>
+        <button type="button" data-nav="data"><i data-lucide="table-2"></i><span data-i18n="yourData">Your data</span></button>
+        <button type="button" data-nav="manual"><i data-lucide="book-open-text"></i><span data-i18n="guideLink">User manual</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="profile"><div class="avatar">Y</div><div><div class="profile-name" data-i18n="yourWorkspace">Your workspace</div><div class="profile-role" data-i18n="gettingStarted">Getting started</div></div></div>
+      </div>
+    </aside>
+
+    <main>
+      <div class="topbar">
+        <div class="crumb"><span data-i18n="project">My first project</span><i data-lucide="chevron-right"></i><strong id="active-crumb" data-i18n="overview">Overview</strong></div>
+        <div class="top-actions"><label class="language-control"><i data-lucide="languages"></i><select id="language-select" aria-label="App language" data-i18n-aria="language"><option value="en">English</option><option value="ur">اردو</option><option value="hi">हिन्दी</option><option value="ar">العربية</option><option value="es">Español</option><option value="fr">Français</option></select></label><button class="button theme-toggle" id="theme-toggle" type="button" aria-pressed="false" aria-label="Dark mode"><i data-lucide="moon"></i><span id="theme-label">Dark mode</span></button><select class="dataset-select" id="dataset-select" aria-label="Saved datasets" hidden></select><span class="updated" id="dataset-status">Sample dataset · 12 rows</span><button class="button" id="auth-open-button" type="button" data-i18n="signIn">Sign in</button><div class="account-actions" id="account-actions" hidden><span class="account-email" id="account-email"></span><button class="button" id="logout-button" type="button" data-i18n="signOut">Sign out</button></div><button class="button primary" id="upload-button" type="button"><i data-lucide="upload"></i><span data-i18n="importData">Import your data</span></button><input id="file-input" type="file" accept=".csv,text/csv" hidden></div>
+      </div>
+
+      <div class="view-shell" id="view-shell">
+          <section class="page-view active" data-view="overview" aria-labelledby="overview-heading">
+            <div class="page-heading"><div><h1 id="overview-heading" tabindex="-1" data-i18n="headline">Your data, in focus.</h1><p class="subtitle" data-i18n="subtitle">A friendly first look at what your numbers are telling you.</p></div></div>
+            <section class="metrics" aria-label="Summary metrics" data-i18n-aria="summaryMetrics">
+              <article class="metric"><div class="metric-top"><span id="metric-label-0">Total revenue</span><span class="metric-icon"><i data-lucide="wallet"></i></span></div><div class="metric-value" id="metric-value-0">$48,290</div><div class="metric-note" id="metric-note-0"><span class="up">+12.8%</span> compared to last period</div></article>
+              <article class="metric"><div class="metric-top"><span id="metric-label-1">Orders</span><span class="metric-icon"><i data-lucide="shopping-bag"></i></span></div><div class="metric-value" id="metric-value-1">1,284</div><div class="metric-note" id="metric-note-1">Across all periods</div></article>
+              <article class="metric"><div class="metric-top"><span id="metric-label-2">Visitors</span><span class="metric-icon"><i data-lucide="users-round"></i></span></div><div class="metric-value" id="metric-value-2">18,640</div><div class="metric-note" id="metric-note-2">Across all periods</div></article>
+              <article class="metric"><div class="metric-top"><span id="metric-label-3">Avg. order value</span><span class="metric-icon"><i data-lucide="receipt"></i></span></div><div class="metric-value" id="metric-value-3">$37.61</div><div class="metric-note" id="metric-note-3">Revenue divided by orders</div></article>
+            </section>
+            <article class="panel insight-panel" id="quick-start">
+              <h2 class="insight-title"><span class="spark"><i data-lucide="sparkles"></i></span><span data-i18n="insightTitle">A little insight</span></h2>
+              <p class="insight-copy" id="insight-copy"></p>
+              <div class="insight-stat"><i data-lucide="lightbulb"></i><span data-i18n="insightTip">Tip: choose a different measure above to compare your numbers.</span></div>
+            </article>
+        </section>
+
+        <section class="page-view" data-view="explore" aria-labelledby="explore-heading" hidden>
+          <div class="page-heading"><div><h1 id="explore-heading" tabindex="-1" data-i18n="explore">Explore data</h1><p class="subtitle" data-i18n="exploreSubtitle">Compare measures and spot changes in your data.</p></div><select class="range-select" id="date-filter" aria-label="Choose date range" data-i18n-aria="dateRange"><option value="all" data-i18n="allPeriods">All available data</option><option value="6" data-i18n="lastSix">Last 6 periods</option><option value="3" data-i18n="lastThree">Last 3 periods</option></select></div>
+          <section class="content-grid" aria-label="Data overview" data-i18n-aria="dataOverview">
+            <article class="panel chart-panel" id="explore-panel">
+              <div class="panel-heading"><div><h2 class="panel-title" data-i18n="chartTitle">See how things change</h2><p class="panel-caption" id="chart-caption">Revenue by Month · each point is one row</p></div>
+                <div class="chart-controls"><select class="control-select" id="measure-select" aria-label="Choose what to measure" data-i18n-aria="chooseMeasure"></select><div class="chart-switch" role="group" aria-label="Chart style" data-i18n-aria="chartStyle"><button class="selected" type="button" data-chart="line" aria-label="Line chart" title="Line chart" data-i18n-aria="lineChart" data-i18n-title="lineChart"><i data-lucide="chart-no-axes-combined"></i></button><button type="button" data-chart="bar" aria-label="Bar chart" title="Bar chart" data-i18n-aria="barChart" data-i18n-title="barChart"><i data-lucide="chart-column"></i></button></div></div>
+              </div>
+              <div class="chart-wrap"><canvas id="trend-chart" role="img" aria-label="Revenue trend chart"></canvas></div>
+            </article>
+          </section>
+        </section>
+
+        <section class="page-view" data-view="data" aria-labelledby="data-heading" hidden>
+          <div class="page-heading"><div><h1 id="data-heading" tabindex="-1" data-i18n="dataTitle">Your data</h1><p class="subtitle" data-i18n="dataSubtitle">Import a CSV and review the rows that power your dashboard.</p></div></div>
+          <section class="panel data-panel" id="data-panel">
+            <div class="panel-heading table-heading"><div><h2 class="panel-title" data-i18n="tableTitle">A peek at your data</h2><p class="panel-caption" data-i18n="tableCaption">Your original rows, just as they were imported.</p></div><div class="table-actions"><span class="row-count" id="row-count">Showing 5 of 12 rows</span><button class="text-button" id="show-rows" type="button"><span data-i18n="showAll">Show all rows</span><i data-lucide="arrow-right"></i></button></div></div>
+            <div class="table-scroll"><table><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div>
+          </section>
+        </section>
+
+        <section class="page-view" data-view="manual" aria-labelledby="manual-heading" hidden>
+          <div class="page-heading"><div><h1 id="manual-heading" tabindex="-1" data-i18n="manualTitle">User manual</h1><p class="subtitle" data-i18n="manualSubtitle">A simple guide to preparing data, importing it, and reading your dashboard.</p></div></div>
+          <section class="tutorial" id="tutorial" aria-labelledby="tutorial-title">
+            <div class="tutorial-heading"><div><h2 id="tutorial-title" data-i18n="tutorialTitle">Your first dashboard, step by step</h2><p data-i18n="tutorialIntro">Get started: prepare a file, upload it, and explore what your numbers mean.</p></div>
+              <div class="tutorial-actions"><button class="button primary" id="guide-upload" type="button"><i data-lucide="upload"></i><span data-i18n="uploadCsv">Upload a CSV</span></button><button class="button" id="download-template" type="button"><i data-lucide="download"></i><span data-i18n="sampleCsv">Sample CSV</span></button></div>
+            </div>
+            <div class="tutorial-grid">
+              <article class="tutorial-step"><span class="tutorial-step-number" data-i18n="stepOne">STEP 01</span><h3 data-i18n="stepOneTitle">Prepare your data</h3><p data-i18n="stepOneText">In Excel or Google Sheets, name each column, for example Month, Sales, Orders. Put one record in each row.</p></article>
+              <article class="tutorial-step"><span class="tutorial-step-number" data-i18n="stepTwo">STEP 02</span><h3 data-i18n="stepTwoTitle">Save it as a CSV</h3><p data-i18n="stepTwoText">Download your file as CSV (.csv). Enter numbers plainly, like 1200; leave out currency signs and thousands separators.</p></article>
+              <article class="tutorial-step"><span class="tutorial-step-number" data-i18n="stepThree">STEP 03</span><h3 data-i18n="stepThreeTitle">Upload your file</h3><p data-i18n="stepThreeText">Choose Upload a CSV, or drag and drop the file onto this page. Your data preview appears below.</p></article>
+              <article class="tutorial-step"><span class="tutorial-step-number" data-i18n="stepFour">STEP 04</span><h3 data-i18n="stepFourTitle">Explore your numbers</h3><p data-i18n="stepFourText">Review totals and averages above. Choose a measure from the dropdown, then switch between line and bar charts. Select Show all rows to see your full dataset.</p></article>
+            </div>
+            <p class="tutorial-note"><strong data-i18n="remember">Remember:</strong> <span data-i18n="tutorialNote">Last 3/6 periods shows the last rows, so sort your CSV from oldest to newest first. Data stays in this tab for now; refreshing restores the sample data. Do not upload sensitive data.</span></p>
+            <p class="tutorial-note" data-i18n="accountSaveTip">Sign in before importing to save each CSV in your account. Without an account, imported data stays only in this browser tab.</p>
+          </section>
+        </section>
+      </div>
+    </main>
+  </div>
+  <div class="drop-overlay" id="drop-overlay" data-i18n="dropCsv">Drop your CSV file to get started</div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog class="auth-modal" id="auth-dialog" aria-labelledby="auth-title">
+    <form class="auth-form" id="auth-form">
+      <div class="auth-heading"><div><h2 id="auth-title" data-i18n="signIn">Sign in</h2><p data-i18n="authIntro">Sign in to save your datasets to your account.</p></div><button class="auth-close" id="auth-close" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
+      <div class="auth-warning" id="auth-setup-warning" hidden></div>
+      <label class="auth-field"><span data-i18n="emailLabel">Email</span><input id="auth-email" type="email" autocomplete="email" required></label>
+      <label class="auth-field" id="password-field"><span id="password-label" data-i18n="passwordLabel">Password</span><input id="auth-password" type="password" autocomplete="current-password" minlength="8" required></label>
+      <p class="auth-message" id="auth-message" role="status" aria-live="polite"></p>
+      <button class="button primary" id="auth-submit" type="submit" data-i18n="signIn">Sign in</button>
+      <div class="auth-links"><button class="auth-link" id="auth-switch-mode" type="button" data-i18n="createAccount">Create an account</button><button class="auth-link" id="auth-reset-password" type="button" data-i18n="forgotPassword">Forgot password?</button></div>
+    </form>
+  </dialog>
+
+  <script>
+    const translations = {
+      en: {
+        workspace: "Workspace", project: "My first project", studio: "Your studio", overview: "Overview", explore: "Explore data", yourData: "Your data", guideLink: "User manual", exploreSubtitle: "Compare measures and spot changes in your data.", dataTitle: "Your data", dataSubtitle: "Import a CSV and review the rows that power your dashboard.", manualTitle: "User manual", manualSubtitle: "A simple guide to preparing data, importing it, and reading your dashboard.", darkMode: "Dark mode", lightMode: "Light mode", yourWorkspace: "Your workspace", gettingStarted: "Getting started", importData: "Import your data", headline: "Your data, in focus.", subtitle: "A friendly first look at what your numbers are telling you.", allPeriods: "All available data", lastSix: "Last 6 periods", lastThree: "Last 3 periods", tutorialTitle: "Your first dashboard, step by step", tutorialIntro: "Get started: prepare a file, upload it, and explore what your numbers mean.", uploadCsv: "Upload a CSV", sampleCsv: "Sample CSV", stepOne: "STEP 01", stepOneTitle: "Prepare your data", stepOneText: "In Excel or Google Sheets, name each column, for example Month, Sales, Orders. Put one record in each row.", stepTwo: "STEP 02", stepTwoTitle: "Save it as a CSV", stepTwoText: "Download your file as CSV (.csv). Enter numbers plainly, like 1200; leave out currency signs and thousands separators.", stepThree: "STEP 03", stepThreeTitle: "Upload your file", stepThreeText: "Choose Upload a CSV, or drag and drop the file onto this page. Your data preview appears below.", stepFour: "STEP 04", stepFourTitle: "Explore your numbers", stepFourText: "Review totals and averages above. Choose a measure from the dropdown, then switch between line and bar charts. Select Show all rows to see your full dataset.", remember: "Remember:", tutorialNote: "Last 3/6 periods shows the last rows, so sort your CSV from oldest to newest first. Data stays in this tab for now; refreshing restores the sample data. Do not upload sensitive data.", summaryMetrics: "Summary metrics", dataOverview: "Data overview", chartTitle: "See how things change", chooseMeasure: "Choose what to measure", chartStyle: "Chart style", lineChart: "Line chart", barChart: "Bar chart", insightTitle: "A little insight", insightTip: "Tip: choose a different measure above to compare your numbers.", tableTitle: "A peek at your data", tableCaption: "Your original rows, just as they were imported.", showAll: "Show all rows", showFewer: "Show fewer rows", showingRows: "Showing {shown} of {total} rows", sampleDataset: "Sample dataset · {count} rows", userDataset: "Your dataset · {count} rows", combinedRows: "Combined across visible rows", numberOfRows: "Number of rows in this view", averagePerRow: "Average per row", totalLabel: "Total", numericColumn: "Numeric column", dataPoints: "Data points", averageNamed: "Average {name}", chartCaption: "{measure} by {dimension} · each point is one row", insightMany: "{high} has the highest {measure} at {value}. That's {change}% above the lowest point, {low}.", insightOne: "You're looking at {value} for {label}. Add more rows to compare patterns.", dropCsv: "Drop your CSV file to get started", chooseCsv: "Choose a .csv file to import.", emptyCsv: "No data found. Check that your CSV has a header row.", readCsvError: "We couldn't read that file. Try exporting it as a CSV.", importedCsv: "Imported {count} rows. Explore your data below.", downloadStarted: "Sample CSV download started.", offline: "Charts need an internet connection to load. Please reconnect and refresh.", language: "App language", dateRange: "Choose date range"
+      },
+      ur: {
+        workspace: "ورک اسپیس", project: "میرا پہلا پروجیکٹ", studio: "آپ کا اسٹوڈیو", overview: "جائزہ", explore: "ڈیٹا دیکھیں", yourData: "آپ کا ڈیٹا", guideLink: "استعمال کی رہنمائی", exploreSubtitle: "اپنے ڈیٹا کے رجحانات اور پیمانوں کا موازنہ کریں۔", dataTitle: "آپ کا ڈیٹا", dataSubtitle: "CSV شامل کریں اور اپنے ڈیش بورڈ کے ڈیٹا کا جائزہ لیں۔", manualTitle: "استعمال کی رہنمائی", manualSubtitle: "ڈیٹا تیار کرنے، شامل کرنے اور ڈیش بورڈ سمجھنے کے آسان مراحل۔", darkMode: "ڈارک موڈ", lightMode: "لائٹ موڈ", yourWorkspace: "آپ کا ورک اسپیس", gettingStarted: "شروعات کریں", importData: "اپنا ڈیٹا شامل کریں", headline: "اپنے ڈیٹا کو سمجھیں۔", subtitle: "آسانی سے جانیں کہ آپ کے اعداد و شمار کیا بتاتے ہیں۔", allPeriods: "تمام دستیاب ڈیٹا", lastSix: "آخری 6 قطاریں", lastThree: "آخری 3 قطاریں", tutorialTitle: "اپنا پہلا ڈیش بورڈ بنائیں", tutorialIntro: "فائل تیار کریں، اپ لوڈ کریں، اور اپنے اعداد و شمار سمجھیں۔", uploadCsv: "CSV اپ لوڈ کریں", sampleCsv: "نمونہ CSV", stepOne: "مرحلہ 01", stepOneTitle: "ڈیٹا تیار کریں", stepOneText: "Excel یا Google Sheets میں ہر کالم کا نام رکھیں، مثلاً Month، Sales، Orders۔ ہر قطار میں ایک ریکارڈ رکھیں۔", stepTwo: "مرحلہ 02", stepTwoTitle: "CSV فائل بنائیں", stepTwoText: "فائل CSV (.csv) میں ڈاؤن لوڈ کریں۔ نمبر سادہ لکھیں، جیسے 1200؛ کرنسی کا نشان یا ہزاروں کا comma نہ لگائیں۔", stepThree: "مرحلہ 03", stepThreeTitle: "فائل اپ لوڈ کریں", stepThreeText: "CSV اپ لوڈ کریں دبائیں یا فائل اس صفحے پر چھوڑ دیں۔ آپ کا ڈیٹا نیچے نظر آئے گا۔", stepFour: "مرحلہ 04", stepFourTitle: "اعداد و شمار دیکھیں", stepFourText: "اوپر مجموعہ اور اوسط دیکھیں۔ مینو سے پیمانہ چنیں اور لائن یا بار چارٹ منتخب کریں۔ مکمل ڈیٹا کے لیے تمام قطاریں دکھائیں۔", remember: "یاد رکھیں:", tutorialNote: "آخری 3/6 قطاریں دیکھنے کے لیے CSV کو پرانی سے نئی ترتیب میں رکھیں۔ ڈیٹا ابھی اسی ٹیب میں رہتا ہے؛ ریفریش کرنے پر نمونہ ڈیٹا واپس آتا ہے۔ حساس معلومات اپ لوڈ نہ کریں۔", summaryMetrics: "خلاصہ", dataOverview: "ڈیٹا کا جائزہ", chartTitle: "وقت کے ساتھ تبدیلی دیکھیں", chooseMeasure: "پیمانہ منتخب کریں", chartStyle: "چارٹ کی قسم", lineChart: "لائن چارٹ", barChart: "بار چارٹ", insightTitle: "ایک اہم بات", insightTip: "مشورہ: موازنہ کرنے کے لیے اوپر کوئی دوسرا پیمانہ منتخب کریں۔", tableTitle: "ڈیٹا کی جھلک", tableCaption: "آپ کی اصل قطاریں، جیسی فائل میں تھیں۔", showAll: "تمام قطاریں دکھائیں", showFewer: "کم قطاریں دکھائیں", showingRows: "{total} میں سے {shown} قطاریں", sampleDataset: "نمونہ ڈیٹا · {count} قطاریں", userDataset: "آپ کا ڈیٹا · {count} قطاریں", combinedRows: "نظر آنے والی قطاروں کا مجموعہ", numberOfRows: "اس منظر میں قطاروں کی تعداد", averagePerRow: "فی قطار اوسط", totalLabel: "کل", numericColumn: "عددی کالم", dataPoints: "ڈیٹا پوائنٹس", averageNamed: "اوسط {name}", chartCaption: "ہر قطار کے لحاظ سے {measure}", insightMany: "{high} میں {measure} سب سے زیادہ ہے: {value}۔ یہ کم ترین قدر {low} سے {change}% زیادہ ہے۔", insightOne: "{label} کے لیے قدر {value} ہے۔ موازنہ دیکھنے کے لیے مزید قطاریں شامل کریں۔", dropCsv: "شروع کرنے کے لیے اپنی CSV فائل یہاں چھوڑیں", chooseCsv: ".csv فائل منتخب کریں۔", emptyCsv: "ڈیٹا نہیں ملا۔ دیکھیں کہ CSV میں کالم کے نام موجود ہیں۔", readCsvError: "فائل نہیں پڑھی جا سکی۔ اسے CSV کے طور پر محفوظ کرکے دوبارہ کوشش کریں۔", importedCsv: "{count} قطاریں شامل ہوگئیں۔ نیچے اپنا ڈیٹا دیکھیں۔", downloadStarted: "نمونہ CSV ڈاؤن لوڈ شروع ہوگیا۔", offline: "چارٹ کے لیے انٹرنیٹ درکار ہے۔ کنکشن بحال کرکے صفحہ ریفریش کریں۔", language: "ایپ کی زبان", dateRange: "تاریخ کی حد منتخب کریں"
+      },
+      hi: {
+        workspace: "वर्कस्पेस", project: "मेरा पहला प्रोजेक्ट", studio: "आपका स्टूडियो", overview: "अवलोकन", explore: "डेटा देखें", yourData: "आपका डेटा", guideLink: "उपयोगकर्ता पुस्तिका", exploreSubtitle: "अपने डेटा के माप और बदलावों की तुलना करें।", dataTitle: "आपका डेटा", dataSubtitle: "CSV अपलोड करें और डैशबोर्ड की पंक्तियाँ देखें।", manualTitle: "उपयोगकर्ता पुस्तिका", manualSubtitle: "डेटा तैयार करने, अपलोड करने और डैशबोर्ड समझने की सरल गाइड।", darkMode: "डार्क मोड", lightMode: "लाइट मोड", yourWorkspace: "आपका वर्कस्पेस", gettingStarted: "शुरुआत करें", importData: "अपना डेटा जोड़ें", headline: "अपने डेटा को समझें।", subtitle: "आसानी से जानें कि आपके आँकड़े क्या बता रहे हैं।", allPeriods: "सभी उपलब्ध डेटा", lastSix: "आखिरी 6 पंक्तियाँ", lastThree: "आखिरी 3 पंक्तियाँ", tutorialTitle: "अपना पहला डैशबोर्ड बनाएँ", tutorialIntro: "फ़ाइल तैयार करें, अपलोड करें और अपने आँकड़ों को समझें।", uploadCsv: "CSV अपलोड करें", sampleCsv: "नमूना CSV", stepOne: "चरण 01", stepOneTitle: "अपना डेटा तैयार करें", stepOneText: "Excel या Google Sheets में हर कॉलम का नाम रखें, जैसे Month, Sales, Orders। हर पंक्ति में एक रिकॉर्ड रखें।", stepTwo: "चरण 02", stepTwoTitle: "CSV के रूप में सेव करें", stepTwoText: "फ़ाइल को CSV (.csv) के रूप में डाउनलोड करें। संख्या सीधे लिखें, जैसे 1200; मुद्रा चिह्न या हजारों के कॉमा न लगाएँ।", stepThree: "चरण 03", stepThreeTitle: "फ़ाइल अपलोड करें", stepThreeText: "CSV अपलोड करें चुनें या फ़ाइल को इस पेज पर छोड़ें। आपका डेटा नीचे दिखाई देगा।", stepFour: "चरण 04", stepFourTitle: "आँकड़ों को समझें", stepFourText: "ऊपर कुल और औसत देखें। ड्रॉपडाउन से माप चुनें और लाइन या बार चार्ट बदलें। पूरा डेटा देखने के लिए सभी पंक्तियाँ दिखाएँ।", remember: "ध्यान दें:", tutorialNote: "आखिरी 3/6 पंक्तियों के लिए CSV को पुराने से नए क्रम में रखें। डेटा अभी इसी टैब में रहता है; रीफ़्रेश करने पर नमूना डेटा लौट आता है। संवेदनशील डेटा अपलोड न करें।", summaryMetrics: "सारांश आँकड़े", dataOverview: "डेटा अवलोकन", chartTitle: "बदलाव देखें", chooseMeasure: "माप चुनें", chartStyle: "चार्ट का प्रकार", lineChart: "लाइन चार्ट", barChart: "बार चार्ट", insightTitle: "एक उपयोगी जानकारी", insightTip: "सलाह: तुलना के लिए ऊपर कोई दूसरा माप चुनें।", tableTitle: "आपके डेटा की झलक", tableCaption: "आपकी मूल पंक्तियाँ, जैसी अपलोड की गई थीं।", showAll: "सभी पंक्तियाँ दिखाएँ", showFewer: "कम पंक्तियाँ दिखाएँ", showingRows: "{total} में से {shown} पंक्तियाँ", sampleDataset: "नमूना डेटा · {count} पंक्तियाँ", userDataset: "आपका डेटा · {count} पंक्तियाँ", combinedRows: "दिखाई गई पंक्तियों का कुल", numberOfRows: "इस दृश्य में पंक्तियों की संख्या", averagePerRow: "प्रति पंक्ति औसत", totalLabel: "कुल", numericColumn: "संख्यात्मक कॉलम", dataPoints: "डेटा पॉइंट", averageNamed: "औसत {name}", chartCaption: "हर पंक्ति के अनुसार {measure}", insightMany: "{high} में {measure} सबसे ज़्यादा है: {value}। यह सबसे कम मान {low} से {change}% अधिक है।", insightOne: "{label} के लिए मान {value} है। तुलना के लिए और पंक्तियाँ जोड़ें।", dropCsv: "शुरू करने के लिए CSV फ़ाइल यहाँ छोड़ें", chooseCsv: "एक .csv फ़ाइल चुनें।", emptyCsv: "डेटा नहीं मिला। जाँचें कि CSV में हेडर पंक्ति है।", readCsvError: "फ़ाइल पढ़ी नहीं जा सकी। इसे CSV के रूप में सेव करके फिर कोशिश करें।", importedCsv: "{count} पंक्तियाँ आयात हुईं। नीचे अपना डेटा देखें।", downloadStarted: "नमूना CSV डाउनलोड शुरू हो गया।", offline: "चार्ट के लिए इंटरनेट चाहिए। कनेक्शन जोड़कर पेज रीफ़्रेश करें।", language: "ऐप की भाषा", dateRange: "तारीख सीमा चुनें"
+      },
+      ar: {
+        workspace: "مساحة العمل", project: "مشروعي الأول", studio: "مساحتك", overview: "نظرة عامة", explore: "استكشاف البيانات", yourData: "بياناتك", guideLink: "دليل المستخدم", exploreSubtitle: "قارن المقاييس واكتشف التغيّرات في بياناتك.", dataTitle: "بياناتك", dataSubtitle: "ارفع ملف CSV وراجع الصفوف التي تعرضها لوحة البيانات.", manualTitle: "دليل المستخدم", manualSubtitle: "خطوات سهلة لإعداد البيانات ورفعها وفهم لوحة البيانات.", darkMode: "الوضع الداكن", lightMode: "الوضع الفاتح", yourWorkspace: "مساحة عملك", gettingStarted: "البدء", importData: "استيراد بياناتك", headline: "اكتشف ما تقوله بياناتك.", subtitle: "نظرة بسيطة تساعدك على فهم أرقامك.", allPeriods: "كل البيانات المتاحة", lastSix: "آخر 6 صفوف", lastThree: "آخر 3 صفوف", tutorialTitle: "أنشئ لوحة بياناتك الأولى", tutorialIntro: "ابدأ بتجهيز ملفك ثم ارفعه واستكشف معنى أرقامك.", uploadCsv: "رفع ملف CSV", sampleCsv: "ملف CSV تجريبي", stepOne: "الخطوة 01", stepOneTitle: "جهّز بياناتك", stepOneText: "سمّ كل عمود في Excel أو Google Sheets، مثل Month وSales وOrders. ضع سجلاً واحداً في كل صف.", stepTwo: "الخطوة 02", stepTwoTitle: "احفظه بصيغة CSV", stepTwoText: "نزّل الملف بصيغة CSV (.csv). اكتب الأرقام مباشرة مثل 1200، من دون رمز العملة أو فواصل الآلاف.", stepThree: "الخطوة 03", stepThreeTitle: "ارفع ملفك", stepThreeText: "اختر رفع ملف CSV أو اسحب الملف وأفلته في الصفحة. ستظهر معاينة البيانات أدناه.", stepFour: "الخطوة 04", stepFourTitle: "استكشف أرقامك", stepFourText: "راجع الإجماليات والمتوسطات أعلاه. اختر مقياساً من القائمة ثم بدّل بين المخطط الخطي والعمودي. اعرض كل الصفوف لرؤية البيانات كاملة.", remember: "تذكّر:", tutorialNote: "يعرض خيار آخر 3/6 فترات الصفوف الأخيرة، لذا رتّب ملف CSV من الأقدم إلى الأحدث. تبقى البيانات في علامة التبويب حالياً؛ تؤدي إعادة التحميل إلى استعادة البيانات التجريبية. لا ترفع بيانات حساسة.", summaryMetrics: "ملخص الأرقام", dataOverview: "نظرة على البيانات", chartTitle: "تابع التغيّر", chooseMeasure: "اختر مقياساً", chartStyle: "نوع المخطط", lineChart: "مخطط خطي", barChart: "مخطط أعمدة", insightTitle: "معلومة مفيدة", insightTip: "نصيحة: اختر مقياساً آخر أعلاه لمقارنة أرقامك.", tableTitle: "لمحة عن بياناتك", tableCaption: "صفوفك الأصلية كما تم استيرادها.", showAll: "عرض كل الصفوف", showFewer: "عرض صفوف أقل", showingRows: "عرض {shown} من أصل {total} صفوف", sampleDataset: "بيانات تجريبية · {count} صفوف", userDataset: "بياناتك · {count} صفوف", combinedRows: "الإجمالي للصفوف الظاهرة", numberOfRows: "عدد الصفوف في هذا العرض", averagePerRow: "المتوسط لكل صف", totalLabel: "الإجمالي", numericColumn: "عمود رقمي", dataPoints: "نقاط البيانات", averageNamed: "متوسط {name}", chartCaption: "‏{measure} حسب {dimension} · كل نقطة صف واحد", insightMany: "تسجل {high} أعلى قيمة لـ{measure} وهي {value}، أي أعلى بنسبة {change}% من أدنى قيمة في {low}.", insightOne: "القيمة في {label} هي {value}. أضف صفوفاً أخرى لمقارنة الأنماط.", dropCsv: "أفلت ملف CSV هنا للبدء", chooseCsv: "اختر ملف .csv لاستيراده.", emptyCsv: "لم يتم العثور على بيانات. تأكد من وجود صف للعناوين في ملف CSV.", readCsvError: "تعذرت قراءة الملف. جرّب تصديره بصيغة CSV.", importedCsv: "تم استيراد {count} صفوف. استكشف بياناتك أدناه.", downloadStarted: "بدأ تنزيل ملف CSV التجريبي.", offline: "يلزم الاتصال بالإنترنت لتحميل المخططات. أعد الاتصال ثم حدّث الصفحة.", language: "لغة التطبيق", dateRange: "اختر النطاق الزمني"
+      },
+      es: {
+        workspace: "Espacio de trabajo", project: "Mi primer proyecto", studio: "Tu espacio", overview: "Resumen", explore: "Explorar datos", yourData: "Tus datos", guideLink: "Manual de usuario", exploreSubtitle: "Compara medidas y descubre cambios en tus datos.", dataTitle: "Tus datos", dataSubtitle: "Importa un CSV y revisa las filas de tu panel.", manualTitle: "Manual de usuario", manualSubtitle: "Una guía sencilla para preparar e importar datos y leer el panel.", darkMode: "Modo oscuro", lightMode: "Modo claro", yourWorkspace: "Tu espacio de trabajo", gettingStarted: "Primeros pasos", importData: "Importar tus datos", headline: "Tus datos, con claridad.", subtitle: "Una primera mirada sencilla a lo que cuentan tus números.", allPeriods: "Todos los datos disponibles", lastSix: "Últimas 6 filas", lastThree: "Últimas 3 filas", tutorialTitle: "Crea tu primer panel paso a paso", tutorialIntro: "Empieza preparando un archivo, impórtalo y descubre qué significan tus números.", uploadCsv: "Subir un CSV", sampleCsv: "CSV de ejemplo", stepOne: "PASO 01", stepOneTitle: "Prepara tus datos", stepOneText: "En Excel o Google Sheets, pon nombre a cada columna, por ejemplo Month, Sales, Orders. Añade un registro por fila.", stepTwo: "PASO 02", stepTwoTitle: "Guárdalo como CSV", stepTwoText: "Descarga el archivo en formato CSV (.csv). Escribe los números sin símbolos de moneda ni separadores de miles, por ejemplo 1200.", stepThree: "PASO 03", stepThreeTitle: "Sube el archivo", stepThreeText: "Pulsa Subir un CSV o arrastra el archivo hasta esta página. La vista previa aparecerá abajo.", stepFour: "PASO 04", stepFourTitle: "Explora tus números", stepFourText: "Consulta los totales y promedios. Elige una medida en el menú y cambia entre gráficos de líneas y barras. Pulsa Mostrar todas las filas para ver todos los datos.", remember: "Recuerda:", tutorialNote: "Últimos 3/6 periodos muestra las últimas filas; ordena el CSV de más antiguo a más reciente. Por ahora, los datos se quedan en esta pestaña; al actualizar, vuelve el ejemplo. No subas datos sensibles.", summaryMetrics: "Métricas", dataOverview: "Vista de datos", chartTitle: "Observa cómo cambian", chooseMeasure: "Elige qué medir", chartStyle: "Tipo de gráfico", lineChart: "Gráfico de líneas", barChart: "Gráfico de barras", insightTitle: "Un dato interesante", insightTip: "Consejo: elige otra medida arriba para comparar tus datos.", tableTitle: "Un vistazo a tus datos", tableCaption: "Tus filas originales tal como se importaron.", showAll: "Mostrar todas las filas", showFewer: "Mostrar menos filas", showingRows: "Mostrando {shown} de {total} filas", sampleDataset: "Datos de ejemplo · {count} filas", userDataset: "Tus datos · {count} filas", combinedRows: "Total de las filas visibles", numberOfRows: "Número de filas en esta vista", averagePerRow: "Promedio por fila", totalLabel: "Total", numericColumn: "Columna numérica", dataPoints: "Puntos de datos", averageNamed: "Promedio de {name}", chartCaption: "{measure} por {dimension} · cada punto es una fila", insightMany: "{high} tiene el valor más alto de {measure}: {value}. Es un {change}% superior al valor más bajo, en {low}.", insightOne: "El valor de {label} es {value}. Añade más filas para comparar tendencias.", dropCsv: "Suelta aquí tu archivo CSV para empezar", chooseCsv: "Elige un archivo .csv para importar.", emptyCsv: "No se encontraron datos. Comprueba que el CSV tenga una fila de encabezados.", readCsvError: "No se pudo leer el archivo. Expórtalo como CSV e inténtalo de nuevo.", importedCsv: "Se importaron {count} filas. Explora tus datos abajo.", downloadStarted: "La descarga del CSV de ejemplo ha comenzado.", offline: "Se necesita internet para cargar los gráficos. Conéctate y actualiza la página.", language: "Idioma de la aplicación", dateRange: "Elige un periodo"
+      },
+      fr: {
+        workspace: "Espace de travail", project: "Mon premier projet", studio: "Votre espace", overview: "Vue d’ensemble", explore: "Explorer les données", yourData: "Vos données", guideLink: "Manuel utilisateur", exploreSubtitle: "Comparez les mesures et repérez les évolutions de vos données.", dataTitle: "Vos données", dataSubtitle: "Importez un CSV et consultez les lignes du tableau de bord.", manualTitle: "Manuel utilisateur", manualSubtitle: "Un guide simple pour préparer et importer des données et lire le tableau de bord.", darkMode: "Mode sombre", lightMode: "Mode clair", yourWorkspace: "Votre espace de travail", gettingStarted: "Pour commencer", importData: "Importer vos données", headline: "Vos données en clair.", subtitle: "Un premier aperçu simple de ce que racontent vos chiffres.", allPeriods: "Toutes les données disponibles", lastSix: "6 dernières lignes", lastThree: "3 dernières lignes", tutorialTitle: "Créez votre premier tableau de bord", tutorialIntro: "Préparez un fichier, importez-le et découvrez ce que signifient vos chiffres.", uploadCsv: "Importer un CSV", sampleCsv: "CSV d’exemple", stepOne: "ÉTAPE 01", stepOneTitle: "Préparez vos données", stepOneText: "Dans Excel ou Google Sheets, nommez chaque colonne, par exemple Month, Sales, Orders. Placez un enregistrement par ligne.", stepTwo: "ÉTAPE 02", stepTwoTitle: "Enregistrez en CSV", stepTwoText: "Téléchargez le fichier au format CSV (.csv). Saisissez les nombres simplement, comme 1200, sans symbole monétaire ni séparateur de milliers.", stepThree: "ÉTAPE 03", stepThreeTitle: "Importez votre fichier", stepThreeText: "Cliquez sur Importer un CSV ou déposez le fichier sur cette page. L’aperçu apparaît ci-dessous.", stepFour: "ÉTAPE 04", stepFourTitle: "Explorez vos chiffres", stepFourText: "Consultez les totaux et les moyennes. Choisissez une mesure, puis passez du graphique en courbes au graphique en barres. Affichez toutes les lignes pour voir l’ensemble des données.", remember: "À retenir :", tutorialNote: "Les 3/6 dernières périodes affichent les dernières lignes : triez votre CSV de la plus ancienne à la plus récente. Pour l’instant, les données restent dans cet onglet ; actualiser restaure l’exemple. N’importez pas de données sensibles.", summaryMetrics: "Indicateurs clés", dataOverview: "Aperçu des données", chartTitle: "Suivez les évolutions", chooseMeasure: "Mesure à afficher", chartStyle: "Type de graphique", lineChart: "Graphique en courbes", barChart: "Graphique en barres", insightTitle: "Un aperçu utile", insightTip: "Conseil : choisissez une autre mesure ci-dessus pour comparer vos chiffres.", tableTitle: "Aperçu de vos données", tableCaption: "Vos lignes d’origine, telles qu’elles ont été importées.", showAll: "Afficher toutes les lignes", showFewer: "Afficher moins de lignes", showingRows: "{shown} lignes sur {total}", sampleDataset: "Données d’exemple · {count} lignes", userDataset: "Vos données · {count} lignes", combinedRows: "Total des lignes visibles", numberOfRows: "Nombre de lignes dans cette vue", averagePerRow: "Moyenne par ligne", totalLabel: "Total", numericColumn: "Colonne numérique", dataPoints: "Points de données", averageNamed: "Moyenne {name}", chartCaption: "{measure} par {dimension} · un point par ligne", insightMany: "{high} affiche la valeur de {measure} la plus élevée : {value}, soit {change}% de plus que la valeur la plus basse, à {low}.", insightOne: "La valeur pour {label} est {value}. Ajoutez des lignes pour comparer les tendances.", dropCsv: "Déposez votre fichier CSV ici pour commencer", chooseCsv: "Choisissez un fichier .csv à importer.", emptyCsv: "Aucune donnée trouvée. Vérifiez que le CSV contient une ligne d’en-tête.", readCsvError: "Impossible de lire ce fichier. Exportez-le au format CSV, puis réessayez.", importedCsv: "{count} lignes importées. Explorez vos données ci-dessous.", downloadStarted: "Le téléchargement du CSV d’exemple a commencé.", offline: "Une connexion Internet est nécessaire pour charger les graphiques. Reconnectez-vous et actualisez la page.", language: "Langue de l’application", dateRange: "Choisir la période"
+      }
+    };
+    const authTranslations = {
+      en: { signIn: "Sign in", signOut: "Sign out", authIntro: "Sign in to save your datasets to your account.", emailLabel: "Email", passwordLabel: "Password", createAccount: "Create an account", haveAccount: "Already have an account? Sign in", forgotPassword: "Forgot password?", setupRequired: "Accounts are not connected yet. Add your Supabase project URL and publishable key to supabase-config.js, then run supabase-schema.sql in the project's SQL Editor.", authUnavailable: "The account service could not load. Check your internet connection and refresh.", signinFailed: "Sign in failed. Check your email and password.", signupEmailSent: "Account created. Check your email to confirm it, then sign in.", passwordResetSent: "If that email has an account, a password reset link is on its way.", saveRequiresAccount: "This data is only in this tab. Sign in to save it to your account.", datasetSaved: "Dataset saved to your account.", datasetSaveFailed: "Could not save this dataset. Your imported data is still open in this tab.", savedDatasets: "Saved datasets", chooseSavedDataset: "Choose a saved dataset", csvTooLarge: "This CSV is over 5 MB. Please split it into smaller files." },
+      ur: { signIn: "لاگ اِن", signOut: "لاگ آؤٹ", authIntro: "اپنے ڈیٹا سیٹس اکاؤنٹ میں محفوظ کرنے کے لیے لاگ اِن کریں۔", emailLabel: "ای میل", passwordLabel: "پاس ورڈ", createAccount: "اکاؤنٹ بنائیں", haveAccount: "اکاؤنٹ موجود ہے؟ لاگ اِن کریں", forgotPassword: "پاس ورڈ بھول گئے؟", setupRequired: "اکاؤنٹس ابھی منسلک نہیں ہیں۔ supabase-config.js میں پروجیکٹ URL اور publishable key ڈالیں، پھر Supabase SQL Editor میں supabase-schema.sql چلائیں۔", authUnavailable: "اکاؤنٹ سروس لوڈ نہیں ہوئی۔ انٹرنیٹ چیک کرکے ریفریش کریں۔", signinFailed: "لاگ اِن نہیں ہوا۔ ای میل اور پاس ورڈ چیک کریں۔", signupEmailSent: "اکاؤنٹ بن گیا۔ تصدیقی ای میل دیکھ کر لاگ اِن کریں۔", passwordResetSent: "اگر اس ای میل کا اکاؤنٹ موجود ہے تو پاس ورڈ ری سیٹ لنک بھیج دیا گیا ہے۔", saveRequiresAccount: "یہ ڈیٹا صرف اسی ٹیب میں ہے۔ اکاؤنٹ میں محفوظ کرنے کے لیے لاگ اِن کریں۔", datasetSaved: "ڈیٹا سیٹ اکاؤنٹ میں محفوظ ہوگیا۔", datasetSaveFailed: "ڈیٹا محفوظ نہیں ہوا؛ درآمد شدہ ڈیٹا اسی ٹیب میں موجود ہے۔", savedDatasets: "محفوظ ڈیٹا سیٹس", chooseSavedDataset: "محفوظ ڈیٹا سیٹ منتخب کریں", csvTooLarge: "CSV فائل 5 MB سے بڑی ہے۔ اسے چھوٹی فائلوں میں تقسیم کریں۔" },
+      hi: { signIn: "साइन इन", signOut: "साइन आउट", authIntro: "अपने डेटासेट खाते में सहेजने के लिए साइन इन करें।", emailLabel: "ईमेल", passwordLabel: "पासवर्ड", createAccount: "खाता बनाएँ", haveAccount: "पहले से खाता है? साइन इन करें", forgotPassword: "पासवर्ड भूल गए?", setupRequired: "अकाउंट अभी कनेक्ट नहीं हैं। supabase-config.js में प्रोजेक्ट URL और publishable key जोड़ें, फिर Supabase SQL Editor में supabase-schema.sql चलाएँ।", authUnavailable: "अकाउंट सेवा लोड नहीं हुई। इंटरनेट जाँचकर रीफ़्रेश करें।", signinFailed: "साइन इन नहीं हुआ। ईमेल और पासवर्ड जाँचें।", signupEmailSent: "खाता बन गया। पुष्टि ईमेल देखकर साइन इन करें।", passwordResetSent: "अगर इस ईमेल का खाता है, तो पासवर्ड रीसेट लिंक भेज दिया गया है।", saveRequiresAccount: "यह डेटा केवल इस टैब में है। खाते में सहेजने के लिए साइन इन करें।", datasetSaved: "डेटासेट खाते में सहेजा गया।", datasetSaveFailed: "डेटासेट सेव नहीं हुआ; आपका डेटा इसी टैब में खुला है।", savedDatasets: "सहेजे गए डेटासेट", chooseSavedDataset: "सहेजा गया डेटासेट चुनें", csvTooLarge: "यह CSV 5 MB से बड़ी है। इसे छोटी फ़ाइलों में बाँटें।" },
+      ar: { signIn: "تسجيل الدخول", signOut: "تسجيل الخروج", authIntro: "سجّل الدخول لحفظ مجموعات البيانات في حسابك.", emailLabel: "البريد الإلكتروني", passwordLabel: "كلمة المرور", createAccount: "إنشاء حساب", haveAccount: "لديك حساب؟ سجّل الدخول", forgotPassword: "هل نسيت كلمة المرور؟", setupRequired: "لم يتم ربط الحسابات بعد. أضف رابط مشروع Supabase ومفتاح النشر إلى supabase-config.js، ثم شغّل supabase-schema.sql في محرر SQL للمشروع.", authUnavailable: "تعذر تحميل خدمة الحساب. تحقق من الإنترنت ثم حدّث الصفحة.", signinFailed: "تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور.", signupEmailSent: "تم إنشاء الحساب. أكّد بريدك الإلكتروني ثم سجّل الدخول.", passwordResetSent: "إذا كان لهذا البريد حساب، فسيصلك رابط إعادة تعيين كلمة المرور.", saveRequiresAccount: "هذه البيانات موجودة في علامة التبويب فقط. سجّل الدخول لحفظها في حسابك.", datasetSaved: "تم حفظ مجموعة البيانات في حسابك.", datasetSaveFailed: "تعذر حفظ البيانات؛ ما زالت مفتوحة في علامة التبويب.", savedDatasets: "مجموعات البيانات المحفوظة", chooseSavedDataset: "اختر مجموعة بيانات محفوظة", csvTooLarge: "حجم ملف CSV أكبر من 5 ميغابايت. قسّمه إلى ملفات أصغر." },
+      es: { signIn: "Iniciar sesión", signOut: "Cerrar sesión", authIntro: "Inicia sesión para guardar tus conjuntos de datos en tu cuenta.", emailLabel: "Correo electrónico", passwordLabel: "Contraseña", createAccount: "Crear una cuenta", haveAccount: "¿Ya tienes cuenta? Inicia sesión", forgotPassword: "¿Olvidaste la contraseña?", setupRequired: "Las cuentas aún no están conectadas. Añade la URL del proyecto Supabase y la clave publicable en supabase-config.js y ejecuta supabase-schema.sql en el editor SQL del proyecto.", authUnavailable: "No se pudo cargar el servicio de cuentas. Comprueba internet y actualiza la página.", signinFailed: "No se pudo iniciar sesión. Revisa el correo y la contraseña.", signupEmailSent: "Cuenta creada. Confirma tu correo y después inicia sesión.", passwordResetSent: "Si ese correo tiene una cuenta, recibirás un enlace para restablecer la contraseña.", saveRequiresAccount: "Estos datos solo están en esta pestaña. Inicia sesión para guardarlos en tu cuenta.", datasetSaved: "Conjunto de datos guardado en tu cuenta.", datasetSaveFailed: "No se pudieron guardar los datos; siguen abiertos en esta pestaña.", savedDatasets: "Datos guardados", chooseSavedDataset: "Elige un conjunto guardado", csvTooLarge: "Este CSV supera los 5 MB. Divídelo en archivos más pequeños." },
+      fr: { signIn: "Se connecter", signOut: "Se déconnecter", authIntro: "Connectez-vous pour enregistrer vos jeux de données dans votre compte.", emailLabel: "Adresse e-mail", passwordLabel: "Mot de passe", createAccount: "Créer un compte", haveAccount: "Vous avez déjà un compte ? Connectez-vous", forgotPassword: "Mot de passe oublié ?", setupRequired: "Les comptes ne sont pas encore connectés. Ajoutez l’URL du projet Supabase et la clé publique dans supabase-config.js, puis exécutez supabase-schema.sql dans l’éditeur SQL du projet.", authUnavailable: "Le service de compte n’a pas pu être chargé. Vérifiez Internet et actualisez la page.", signinFailed: "Connexion impossible. Vérifiez votre e-mail et votre mot de passe.", signupEmailSent: "Compte créé. Confirmez votre e-mail, puis connectez-vous.", passwordResetSent: "Si cette adresse possède un compte, un lien de réinitialisation sera envoyé.", saveRequiresAccount: "Ces données restent dans cet onglet. Connectez-vous pour les enregistrer dans votre compte.", datasetSaved: "Jeu de données enregistré dans votre compte.", datasetSaveFailed: "Impossible d’enregistrer les données ; elles restent ouvertes dans cet onglet.", savedDatasets: "Données enregistrées", chooseSavedDataset: "Choisir des données enregistrées", csvTooLarge: "Ce fichier CSV dépasse 5 Mo. Divisez-le en fichiers plus petits." }
+    };
+    const accountSaveTipTranslations = {
+      en: "Sign in before importing to save each CSV in your account. Without an account, imported data stays only in this browser tab.",
+      ur: "ہر CSV اکاؤنٹ میں محفوظ کرنے کے لیے پہلے لاگ اِن کریں۔ بغیر اکاؤنٹ کے درآمد شدہ ڈیٹا صرف اسی براؤزر ٹیب میں رہے گا۔",
+      hi: "हर CSV को खाते में सहेजने के लिए पहले साइन इन करें। बिना खाते के आयात किया गया डेटा केवल इसी ब्राउज़र टैब में रहेगा।",
+      ar: "سجّل الدخول قبل الاستيراد لحفظ كل ملف CSV في حسابك. بدون حساب، تبقى البيانات في علامة التبويب هذه فقط.",
+      es: "Inicia sesión antes de importar para guardar cada CSV en tu cuenta. Sin cuenta, los datos solo permanecen en esta pestaña.",
+      fr: "Connectez-vous avant l’importation pour enregistrer chaque CSV dans votre compte. Sans compte, les données restent dans cet onglet."
+    };
+    const tutorialNoteTranslations = {
+      en: "Last 3/6 periods shows the last rows, so sort your CSV from oldest to newest first. Do not upload sensitive data.",
+      ur: "آخری 3/6 قطاریں دیکھنے کے لیے CSV کو پرانی سے نئی ترتیب میں رکھیں۔ حساس معلومات اپ لوڈ نہ کریں۔",
+      hi: "आखिरी 3/6 पंक्तियों के लिए CSV को पुराने से नए क्रम में रखें। संवेदनशील डेटा अपलोड न करें।",
+      ar: "يعرض خيار آخر 3/6 فترات الصفوف الأخيرة، لذا رتّب ملف CSV من الأقدم إلى الأحدث. لا ترفع بيانات حساسة.",
+      es: "Últimos 3/6 periodos muestra las últimas filas; ordena el CSV de más antiguo a más reciente. No subas datos sensibles.",
+      fr: "Les 3/6 dernières périodes affichent les dernières lignes : triez le CSV de la plus ancienne à la plus récente. N’importez pas de données sensibles."
+    };
+    const authFlowTranslations = {
+      en: { newPassword: "New password", updatePassword: "Update password" },
+      ur: { newPassword: "نیا پاس ورڈ", updatePassword: "پاس ورڈ اپ ڈیٹ کریں" },
+      hi: { newPassword: "नया पासवर्ड", updatePassword: "पासवर्ड अपडेट करें" },
+      ar: { newPassword: "كلمة مرور جديدة", updatePassword: "تحديث كلمة المرور" },
+      es: { newPassword: "Nueva contraseña", updatePassword: "Actualizar contraseña" },
+      fr: { newPassword: "Nouveau mot de passe", updatePassword: "Mettre à jour le mot de passe" }
+    };
+    const localeCodes = { en: "en-US", ur: "ur-PK", hi: "hi-IN", ar: "ar", es: "es-ES", fr: "fr-FR" };
+    let activeLanguage = "en";
+    const languageSelect = document.getElementById("language-select");
+    const themeToggle = document.getElementById("theme-toggle");
+    let activeTheme = "light";
+    let activeView = "overview";
+    try {
+      const savedLanguage = localStorage.getItem("fieldnote-language");
+      if (savedLanguage && translations[savedLanguage]) activeLanguage = savedLanguage;
+      const savedTheme = localStorage.getItem("fieldnote-theme");
+      if (savedTheme === "dark" || savedTheme === "light") activeTheme = savedTheme;
+      const savedView = localStorage.getItem("fieldnote-view");
+      if (["overview", "explore", "data", "manual"].includes(savedView)) activeView = savedView;
+    } catch {}
+
+    function t(key, values = {}) {
+      const localizedNote = key === "accountSaveTip" ? accountSaveTipTranslations[activeLanguage] : key === "tutorialNote" ? tutorialNoteTranslations[activeLanguage] : "";
+      const template = localizedNote || authFlowTranslations[activeLanguage]?.[key] || authTranslations[activeLanguage]?.[key] || translations[activeLanguage][key] || authFlowTranslations.en[key] || authTranslations.en[key] || translations.en[key] || key;
+      return template.replace(/\{(\w+)\}/g, (_, name) => values[name] ?? "");
+    }
+
+    function showView(viewName, focusHeading = true) {
+      const view = document.querySelector(`[data-view="${viewName}"]`);
+      if (!view) return;
+      activeView = viewName;
+      document.querySelectorAll(".page-view").forEach((item) => {
+        const isActive = item === view;
+        item.hidden = !isActive;
+        item.classList.toggle("active", isActive);
+      });
+      document.querySelectorAll("[data-nav]").forEach((button) => {
+        const isActive = button.dataset.nav === viewName;
+        button.classList.toggle("active", isActive);
+        if (isActive) button.setAttribute("aria-current", "page");
+        else button.removeAttribute("aria-current");
+      });
+      const titleKey = { overview: "overview", explore: "explore", data: "yourData", manual: "guideLink" }[viewName];
+      document.getElementById("active-crumb").textContent = t(titleKey);
+      document.title = `Fieldnote | ${t(titleKey)}`;
+      try { localStorage.setItem("fieldnote-view", viewName); } catch {}
+      if (focusHeading) view.querySelector("h1")?.focus({ preventScroll: true });
+      if (viewName === "explore" && chart) requestAnimationFrame(() => chart.resize());
+    }
+
+    function applyTheme() {
+      const isDark = activeTheme === "dark";
+      const actionKey = isDark ? "lightMode" : "darkMode";
+      document.documentElement.dataset.theme = activeTheme;
+      themeToggle.setAttribute("aria-pressed", String(isDark));
+      themeToggle.setAttribute("aria-label", t(actionKey));
+      themeToggle.title = t(actionKey);
+      themeToggle.querySelector("span").textContent = t(actionKey);
+      themeToggle.querySelector("[data-lucide]").setAttribute("data-lucide", isDark ? "sun" : "moon");
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function applyLanguage() {
+      const direction = activeLanguage === "ur" || activeLanguage === "ar" ? "rtl" : "ltr";
+      document.documentElement.lang = activeLanguage;
+      document.documentElement.dir = direction;
+      document.querySelectorAll("[data-i18n]").forEach((element) => { element.textContent = t(element.dataset.i18n); });
+      document.querySelectorAll("[data-i18n-aria]").forEach((element) => { element.setAttribute("aria-label", t(element.dataset.i18nAria)); });
+      document.querySelectorAll("[data-i18n-title]").forEach((element) => { element.title = t(element.dataset.i18nTitle); });
+      document.title = `Fieldnote | ${t("studio")}`;
+      languageSelect.value = activeLanguage;
+      numberFormat = new Intl.NumberFormat(localeCodes[activeLanguage], { maximumFractionDigits: 2 });
+      moneyFormat = new Intl.NumberFormat(localeCodes[activeLanguage], { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+    }
+
+    const sampleRows = [
+      { Month: "Jan", Region: "North", Revenue: 3120, Orders: 86, Visitors: 1420 },
+      { Month: "Feb", Region: "South", Revenue: 2980, Orders: 79, Visitors: 1310 },
+      { Month: "Mar", Region: "East", Revenue: 3540, Orders: 94, Visitors: 1490 },
+      { Month: "Apr", Region: "West", Revenue: 3290, Orders: 88, Visitors: 1370 },
+      { Month: "May", Region: "North", Revenue: 3860, Orders: 102, Visitors: 1510 },
+      { Month: "Jun", Region: "South", Revenue: 3610, Orders: 96, Visitors: 1460 },
+      { Month: "Jul", Region: "East", Revenue: 4200, Orders: 111, Visitors: 1580 },
+      { Month: "Aug", Region: "West", Revenue: 3980, Orders: 105, Visitors: 1490 },
+      { Month: "Sep", Region: "North", Revenue: 4470, Orders: 119, Visitors: 1640 },
+      { Month: "Oct", Region: "South", Revenue: 4210, Orders: 112, Visitors: 1560 },
+      { Month: "Nov", Region: "East", Revenue: 4610, Orders: 121, Visitors: 1680 },
+      { Month: "Dec", Region: "West", Revenue: 5420, Orders: 171, Visitors: 2130 }
+    ];
+    const colors = { green: "#277a5e", yellow: "#e4c85e", coral: "#e78469" };
+    let rows = sampleRows;
+    let visibleRows = 5;
+    let chartType = "line";
+    let activeMeasure = "";
+    let chart;
+    let toastTimer;
+
+    let numberFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+    let moneyFormat = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+    const MAX_CSV_BYTES = 5 * 1024 * 1024;
+    const supabaseConfig = window.FIELDNOTE_SUPABASE_CONFIG || {};
+    const authDialog = document.getElementById("auth-dialog");
+    const authForm = document.getElementById("auth-form");
+    const authEmail = document.getElementById("auth-email");
+    const authPassword = document.getElementById("auth-password");
+    const authSubmit = document.getElementById("auth-submit");
+    const authMessage = document.getElementById("auth-message");
+    const authWarning = document.getElementById("auth-setup-warning");
+    const authOpenButton = document.getElementById("auth-open-button");
+    const accountActions = document.getElementById("account-actions");
+    const datasetSelect = document.getElementById("dataset-select");
+    let supabaseClient = null;
+    let currentUser = null;
+    let savedDatasets = [];
+    let activeDatasetId = "";
+    let authMode = "signin";
+    const elements = {
+      fileInput: document.getElementById("file-input"),
+      status: document.getElementById("dataset-status"),
+      dateFilter: document.getElementById("date-filter"),
+      measure: document.getElementById("measure-select"),
+      caption: document.getElementById("chart-caption"),
+      tableHead: document.getElementById("table-head"),
+      tableBody: document.getElementById("table-body"),
+      rowCount: document.getElementById("row-count"),
+      showRows: document.getElementById("show-rows"),
+      insight: document.getElementById("insight-copy"),
+      toast: document.getElementById("toast"),
+      overlay: document.getElementById("drop-overlay")
+    };
+
+    function hasSupabaseConfig() {
+      return typeof supabaseConfig.url === "string" && /^https:\/\//.test(supabaseConfig.url) && !supabaseConfig.url.includes("YOUR_PROJECT_ID") && typeof supabaseConfig.anonKey === "string" && supabaseConfig.anonKey.length > 20 && !supabaseConfig.anonKey.includes("YOUR_SUPABASE_");
+    }
+
+    function renderAuthMode() {
+      const isSignup = authMode === "signup";
+      const isRecovery = authMode === "recovery";
+      const actionKey = isRecovery ? "updatePassword" : isSignup ? "createAccount" : "signIn";
+      document.getElementById("auth-title").textContent = t(actionKey);
+      authSubmit.textContent = t(actionKey);
+      document.getElementById("password-label").textContent = t(isRecovery ? "newPassword" : "passwordLabel");
+      document.getElementById("auth-switch-mode").textContent = t(isSignup ? "haveAccount" : "createAccount");
+      document.getElementById("auth-switch-mode").hidden = isRecovery;
+      document.getElementById("auth-reset-password").hidden = isSignup || isRecovery;
+      authPassword.autocomplete = isSignup || isRecovery ? "new-password" : "current-password";
+      authMessage.textContent = "";
+    }
+
+    function openAuthDialog() {
+      authWarning.hidden = Boolean(supabaseClient);
+      authWarning.textContent = supabaseClient ? "" : (window.supabase?.createClient ? t("setupRequired") : t("authUnavailable"));
+      authSubmit.disabled = !supabaseClient;
+      authMode = "signin";
+      renderAuthMode();
+      authDialog.showModal();
+    }
+
+    function renderSavedDatasets() {
+      datasetSelect.innerHTML = `<option value="">${escapeHtml(t("chooseSavedDataset"))}</option>${savedDatasets.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("")}`;
+      datasetSelect.value = activeDatasetId;
+      datasetSelect.hidden = savedDatasets.length === 0;
+    }
+
+    async function applySavedDataset(datasetId) {
+      const dataset = savedDatasets.find((item) => item.id === datasetId);
+      if (!dataset) return;
+      activeDatasetId = dataset.id;
+      rows = dataset.data_rows;
+      visibleRows = 5;
+      elements.dateFilter.value = "all";
+      activeMeasure = "";
+      refresh();
+      showView("overview", false);
+    }
+
+    async function loadSavedDatasets() {
+      if (!supabaseClient || !currentUser) return;
+      const { data, error } = await supabaseClient.from("analytics_datasets").select("id,name,data_rows,updated_at").order("updated_at", { ascending: false });
+      if (error) {
+        notify(error.message || t("datasetSaveFailed"));
+        return;
+      }
+      savedDatasets = data || [];
+      renderSavedDatasets();
+      if (savedDatasets.length) await applySavedDataset(savedDatasets[0].id);
+    }
+
+    async function saveDataset(name, dataRows) {
+      if (!supabaseClient || !currentUser) return false;
+      const { data, error } = await supabaseClient.from("analytics_datasets").insert({
+        user_id: currentUser.id,
+        name: name.trim().slice(0, 120) || "Imported dataset",
+        data_rows: dataRows
+      }).select("id,name,data_rows,updated_at").single();
+      if (error) {
+        notify(`${t("datasetSaveFailed")} ${error.message}`);
+        return false;
+      }
+      savedDatasets.unshift(data);
+      activeDatasetId = data.id;
+      renderSavedDatasets();
+      notify(t("datasetSaved"));
+      return true;
+    }
+
+    async function syncAccount(session) {
+      const nextUser = session?.user || null;
+      const previousUserId = currentUser?.id || "";
+      const hasGuestData = !previousUserId && rows !== sampleRows && !activeDatasetId;
+      currentUser = nextUser;
+      authOpenButton.hidden = Boolean(currentUser);
+      accountActions.hidden = !currentUser;
+      document.getElementById("account-email").textContent = currentUser?.email || "";
+      if (currentUser && previousUserId !== currentUser.id) {
+        if (previousUserId) {
+          rows = sampleRows;
+          activeDatasetId = "";
+          visibleRows = 5;
+          refresh();
+        }
+        if (hasGuestData) {
+          await saveDataset("Imported dataset", rows);
+        } else {
+          await loadSavedDatasets();
+        }
+      } else if (!currentUser && previousUserId) {
+        savedDatasets = [];
+        activeDatasetId = "";
+        rows = sampleRows;
+        visibleRows = 5;
+        renderSavedDatasets();
+        refresh();
+      }
+    }
+
+    async function initializeAuth() {
+      if (!hasSupabaseConfig() || !window.supabase?.createClient) return;
+      supabaseClient = window.supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+      });
+      authSubmit.disabled = false;
+      authWarning.hidden = true;
+      supabaseClient.auth.onAuthStateChange((_event, session) => {
+        setTimeout(() => syncAccount(session), 0);
+      });
+      const { data, error } = await supabaseClient.auth.getSession();
+      if (error) {
+        notify(error.message);
+        return;
+      }
+      await syncAccount(data.session);
+      if (new URLSearchParams(window.location.hash.slice(1)).get("type") === "recovery") {
+        authMode = "recovery";
+        authWarning.hidden = true;
+        authSubmit.disabled = false;
+        renderAuthMode();
+        authDialog.showModal();
+      }
+    }
+
+    async function submitAuth(event) {
+      event.preventDefault();
+      if (!supabaseClient) return;
+      const email = authEmail.value.trim();
+      const password = authPassword.value;
+      authSubmit.disabled = true;
+      authMessage.textContent = "";
+      const result = authMode === "signup"
+        ? await supabaseClient.auth.signUp({ email, password, options: { emailRedirectTo: window.location.href.split("#")[0] } })
+        : authMode === "recovery"
+          ? await supabaseClient.auth.updateUser({ password })
+          : await supabaseClient.auth.signInWithPassword({ email, password });
+      authSubmit.disabled = false;
+      if (result.error) {
+        authMessage.textContent = result.error.message || t("signinFailed");
+        return;
+      }
+      if (authMode === "signup" && !result.data.session) {
+        authMessage.textContent = t("signupEmailSent");
+        authPassword.value = "";
+        return;
+      }
+      authDialog.close();
+      authForm.reset();
+    }
+
+    async function resetPassword() {
+      if (!supabaseClient) return;
+      const email = authEmail.value.trim();
+      if (!email) {
+        authMessage.textContent = t("emailLabel");
+        authEmail.focus();
+        return;
+      }
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: window.location.href.split("#")[0] });
+      authMessage.textContent = error ? error.message : t("passwordResetSent");
+    }
+
+    function currentRows() {
+      const count = elements.dateFilter.value === "all" ? rows.length : Number(elements.dateFilter.value);
+      return rows.slice(Math.max(0, rows.length - count));
+    }
+
+    function numericColumns() {
+      if (!rows.length) return [];
+      return Object.keys(rows[0]).filter((key) => rows.some((row) => row[key] !== "" && Number.isFinite(Number(row[key]))));
+    }
+
+    function dimensionColumn() {
+      const columns = Object.keys(rows[0] || {});
+      return columns.find((key) => !numericColumns().includes(key)) || columns[0];
+    }
+
+    function displayValue(value, column) {
+      const label = column.toLowerCase();
+      if (label.includes("revenue") || label.includes("sales") || label.includes("amount") || label.includes("price")) return moneyFormat.format(value);
+      return numberFormat.format(value);
+    }
+
+    function summarizeRows(sourceRows) {
+      const columns = numericColumns();
+      const sum = (column) => sourceRows.reduce((total, row) => total + (Number(row[column]) || 0), 0);
+      const revenue = columns.find((column) => /revenue|sales|amount|price/i.test(column)) || columns[0];
+      const orders = columns.find((column) => /orders|purchases|transactions/i.test(column) && column !== revenue) || columns.find((column) => column !== revenue);
+      const visitors = columns.find((column) => /visitors|sessions|traffic/i.test(column) && column !== revenue && column !== orders) || columns.find((column) => column !== revenue && column !== orders);
+      const totalRevenue = revenue ? sum(revenue) : 0;
+      const totalOrders = orders ? sum(orders) : 0;
+      const totalVisitors = visitors ? sum(visitors) : 0;
+      const metrics = [
+        { label: revenue || t("totalLabel"), value: revenue ? displayValue(totalRevenue, revenue) : "—", note: t("combinedRows") },
+        { label: orders || t("numericColumn"), value: orders ? numberFormat.format(totalOrders) : (columns[0] ? numberFormat.format(sum(columns[0])) : "—"), note: t("combinedRows") },
+        { label: visitors || t("dataPoints"), value: visitors ? numberFormat.format(totalVisitors) : numberFormat.format(sourceRows.length), note: visitors ? t("combinedRows") : t("numberOfRows") },
+        { label: t("averageNamed", { name: revenue || t("totalLabel").toLowerCase() }), value: revenue && sourceRows.length ? displayValue(totalRevenue / sourceRows.length, revenue) : "—", note: t("averagePerRow") }
+      ];
+      metrics.forEach((metric, index) => {
+        document.getElementById(`metric-label-${index}`).textContent = metric.label;
+        document.getElementById(`metric-value-${index}`).textContent = metric.value;
+        document.getElementById(`metric-note-${index}`).textContent = metric.note;
+      });
+      return { revenue, totalRevenue, totalOrders, totalVisitors };
+    }
+
+    function updateChart(sourceRows) {
+      const column = activeMeasure || numericColumns()[0];
+      const dimension = dimensionColumn();
+      if (!column || !dimension) return;
+      const labels = sourceRows.map((row) => String(row[dimension] ?? "Row"));
+      const values = sourceRows.map((row) => Number(row[column]) || 0);
+      const context = document.getElementById("trend-chart").getContext("2d");
+      const fill = context.createLinearGradient(0, 0, 0, 250);
+      fill.addColorStop(0, "rgb(39 122 94 / 20%)");
+      fill.addColorStop(1, "rgb(39 122 94 / 0%)");
+      if (chart) chart.destroy();
+      chart = new Chart(context, {
+        type: chartType,
+        data: { labels, datasets: [{ label: column, data: values, borderColor: colors.green, backgroundColor: chartType === "line" ? fill : labels.map((_, index) => [colors.green, colors.yellow, colors.coral][index % 3]), borderWidth: chartType === "line" ? 2.5 : 0, fill: chartType === "line", tension: .36, pointRadius: chartType === "line" ? 3 : 0, pointHoverRadius: 5, pointBackgroundColor: colors.green, borderRadius: chartType === "bar" ? 4 : 0, maxBarThickness: 38 }] },
+        options: {
+          maintainAspectRatio: false,
+          interaction: { intersect: false, mode: "index" },
+          plugins: {
+            legend: { display: false },
+            tooltip: { backgroundColor: "#253b30", padding: 10, titleFont: { family: "DM Sans", size: 11 }, bodyFont: { family: "DM Mono", size: 11 }, displayColors: false, callbacks: { label: (item) => displayValue(item.raw, column) } }
+          },
+          scales: {
+            x: { grid: { display: false }, border: { display: false }, ticks: { color: "#879188", font: { family: "DM Sans", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 9 } },
+            y: { beginAtZero: true, grid: { color: "#edf0ea", drawTicks: false }, border: { display: false }, ticks: { color: "#879188", padding: 10, font: { family: "DM Mono", size: 9 }, callback: (value) => Number(value) >= 1000 ? `${(value / 1000).toFixed(0)}k` : value } }
+          }
+        }
+      });
+      elements.caption.textContent = t("chartCaption", { measure: column, dimension });
+      document.getElementById("trend-chart").setAttribute("aria-label", `${column} ${t("chartTitle").toLowerCase()}`);
+      updateInsight(sourceRows, column, dimension);
+    }
+
+    function updateInsight(sourceRows, column, dimension) {
+      if (!sourceRows.length) return;
+      const highest = sourceRows.reduce((best, row) => Number(row[column]) > Number(best[column]) ? row : best, sourceRows[0]);
+      const lowest = sourceRows.reduce((best, row) => Number(row[column]) < Number(best[column]) ? row : best, sourceRows[0]);
+      if (sourceRows.length < 2) {
+        elements.insight.textContent = t("insightOne", { value: displayValue(Number(highest[column]) || 0, column), label: String(highest[dimension]) });
+        return;
+      }
+      const change = Number(lowest[column]) ? ((Number(highest[column]) - Number(lowest[column])) / Number(lowest[column]) * 100) : 0;
+      elements.insight.textContent = t("insightMany", { high: String(highest[dimension]), measure: column.toLowerCase(), value: displayValue(Number(highest[column]) || 0, column), change: numberFormat.format(change), low: String(lowest[dimension]) });
+    }
+
+    function renderTable() {
+      const columns = Object.keys(rows[0] || {});
+      const shown = rows.slice(0, visibleRows);
+      elements.tableHead.innerHTML = `<tr>${columns.map((column) => `<th scope="col">${escapeHtml(column)}</th>`).join("")}</tr>`;
+      elements.tableBody.innerHTML = shown.map((row) => `<tr>${columns.map((column) => `<td class="${numericColumns().includes(column) ? "numeric" : ""}">${escapeHtml(String(row[column] ?? ""))}</td>`).join("")}</tr>`).join("");
+      elements.rowCount.textContent = t("showingRows", { shown: numberFormat.format(shown.length), total: numberFormat.format(rows.length) });
+      elements.showRows.hidden = rows.length <= 5;
+      elements.showRows.querySelector("span").textContent = visibleRows >= rows.length ? t("showFewer") : t("showAll");
+      elements.status.textContent = t(rows === sampleRows ? "sampleDataset" : "userDataset", { count: numberFormat.format(rows.length) });
+    }
+
+    function refresh() {
+      const columns = numericColumns();
+      if (!columns.includes(activeMeasure)) activeMeasure = columns[0] || "";
+      elements.measure.innerHTML = columns.map((column) => `<option value="${escapeHtml(column)}" ${column === activeMeasure ? "selected" : ""}>${escapeHtml(column)}</option>`).join("");
+      summarizeRows(currentRows());
+      updateChart(currentRows());
+      renderTable();
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function escapeHtml(value) {
+      return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[character]);
+    }
+
+    function notify(message) {
+      elements.toast.textContent = message;
+      elements.toast.classList.add("visible");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => elements.toast.classList.remove("visible"), 3200);
+    }
+
+    function loadCsv(file) {
+      if (!file || !/\.csv$/i.test(file.name)) {
+        notify(t("chooseCsv"));
+        return;
+      }
+      if (file.size > MAX_CSV_BYTES) {
+        notify(t("csvTooLarge"));
+        return;
+      }
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: "greedy",
+        transformHeader: (header) => header.trim(),
+        complete: async (result) => {
+          const cleanRows = result.data.filter((row) => Object.values(row).some((value) => String(value).trim() !== ""));
+          if (!cleanRows.length || !Object.keys(cleanRows[0]).length) {
+            notify(t("emptyCsv"));
+            return;
+          }
+          rows = cleanRows.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => {
+            const trimmed = String(value ?? "").trim();
+            const numeric = trimmed !== "" && Number.isFinite(Number(trimmed));
+            return [key, numeric ? Number(trimmed) : trimmed];
+          })));
+          visibleRows = 5;
+          elements.dateFilter.value = "all";
+          activeMeasure = "";
+          refresh();
+          if (currentUser) await saveDataset(file.name.replace(/\.[^.]+$/, ""), rows);
+          else notify(t("saveRequiresAccount"));
+        },
+        error: () => notify(t("readCsvError"))
+      });
+    }
+
+    document.getElementById("upload-button").addEventListener("click", () => elements.fileInput.click());
+    document.getElementById("guide-upload").addEventListener("click", () => elements.fileInput.click());
+    document.getElementById("download-template").addEventListener("click", () => {
+      const csv = "Month,Sales,Orders\r\nJan,1200,24\r\nFeb,1450,29\r\nMar,1320,27\r\n";
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "fieldnote-sample.csv";
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      notify(t("downloadStarted"));
+    });
+    authOpenButton.addEventListener("click", openAuthDialog);
+    document.getElementById("auth-close").addEventListener("click", () => authDialog.close());
+    authForm.addEventListener("submit", submitAuth);
+    document.getElementById("auth-switch-mode").addEventListener("click", () => {
+      authMode = authMode === "signin" ? "signup" : "signin";
+      renderAuthMode();
+    });
+    document.getElementById("auth-reset-password").addEventListener("click", resetPassword);
+    document.getElementById("logout-button").addEventListener("click", async () => {
+      if (!supabaseClient) return;
+      const { error } = await supabaseClient.auth.signOut();
+      if (error) notify(error.message);
+    });
+    datasetSelect.addEventListener("change", () => applySavedDataset(datasetSelect.value));
+    languageSelect.addEventListener("change", () => {
+      activeLanguage = translations[languageSelect.value] ? languageSelect.value : "en";
+      try { localStorage.setItem("fieldnote-language", activeLanguage); } catch {}
+      applyLanguage();
+      applyTheme();
+      if (authDialog.open) renderAuthMode();
+      if (savedDatasets.length) renderSavedDatasets();
+      showView(activeView, false);
+      refresh();
+    });
+    themeToggle.addEventListener("click", () => {
+      activeTheme = activeTheme === "dark" ? "light" : "dark";
+      try { localStorage.setItem("fieldnote-theme", activeTheme); } catch {}
+      applyTheme();
+      refresh();
+    });
+    elements.fileInput.addEventListener("change", (event) => loadCsv(event.target.files[0]));
+    elements.dateFilter.addEventListener("change", refresh);
+    elements.measure.addEventListener("change", (event) => { activeMeasure = event.target.value; refresh(); });
+    document.querySelectorAll("[data-chart]").forEach((button) => button.addEventListener("click", () => {
+      chartType = button.dataset.chart;
+      document.querySelectorAll("[data-chart]").forEach((item) => item.classList.toggle("selected", item === button));
+      refresh();
+    }));
+    elements.showRows.addEventListener("click", () => {
+      visibleRows = visibleRows >= rows.length ? 5 : rows.length;
+      renderTable();
+    });
+    document.querySelectorAll("[data-nav]").forEach((button) => button.addEventListener("click", () => showView(button.dataset.nav)));
+    document.addEventListener("dragover", (event) => { event.preventDefault(); elements.overlay.classList.add("visible"); });
+    document.addEventListener("dragleave", (event) => { if (!event.relatedTarget) elements.overlay.classList.remove("visible"); });
+    document.addEventListener("drop", (event) => {
+      event.preventDefault();
+      elements.overlay.classList.remove("visible");
+      loadCsv(event.dataTransfer.files[0]);
+    });
+
+    applyLanguage();
+    applyTheme();
+    showView(activeView, false);
+    initializeAuth();
+    if (window.Chart && window.Papa) refresh();
+    else notify(t("offline"));
+  </script>
+</body>
+</html>
